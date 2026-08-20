@@ -1,0 +1,66 @@
+
+//  <div className="min-h-screen flex items-center justify-center bg-[#FFE5D0] px-4">
+//              <div className="w-full max-w-5xl bg-[#FFE5D0] rounded-3xl shadow-lg grid grid-cols-1 md:grid-cols-2 overflow-hidden">
+//                 {/* Left */}
+//                 <div className="flex flex-col justify-center p-10 bg-[#FFF2E9]">
+//                     {/* Logo */}
+//                     <h1 className="text-3xl font-bold text-orange-600 mb-6">Nena</h1>
+//                     <h2 className="text-2xl font-semibold mb-8">Login</h2>
+                
+//                 <img className='self-center mb-4 w-24 md:w-32' src={logo} alt="Logo" />
+//                 <h1 className='text-center mb-4 font-body text-xl font-bold text-Heading'>Welcome Back!</h1>
+//                 <p className='text-center text-base text-Heading mb-4'>{'Let\'s Keep the Momentum Going'}</p>
+
+//                 {errorMessage && (
+//                     <div className="text-red-600 text-sm mt-2 text-center">{errorMessage}</div>
+//                 )}
+//                  {isLoading && (
+//                     <div className="text-secondary text-sm mt-2 text-center">"Signing in... "</div>
+//                 )}
+              
+                
+               
+//                 <form className="space-y-5" onSubmit={handleSubmit}>
+//                    
+//                     <div className='relative border p-2 rounded-[8px]'>
+//                         <input
+//                             className=' text-Heading pr-10 outline-none'
+//                             type={passwordVisible ? "text" : "password"}
+//                             placeholder="Password"
+//                             value={password}
+//                             onChange={e => setPassword(e.target.value)}
+//                         />
+//                         <div className='absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5'>
+//                             {passwordVisible ? (
+//                                 <PiEyeLight className='fill-Heading' onClick={togglePasswordVisibility} />
+//                             ) : (
+//                                 <PiEyeSlash className='fill-Heading' onClick={togglePasswordVisibility} />
+//                             )}
+//                         </div>
+//                     </div>
+//                     <div className='flex items-center justify-between'>
+//                         <div className='flex items-center space-x-2 font-body text-sm font-normal text-Heading'>
+//                             <input type='checkbox' />
+//                             <label>Remember me</label>
+//                         </div>
+//                         <p className='text-secondary hover:cursor-pointer font-body text-sm font-normal'>Forgot password?</p>
+//                     </div>
+//                     <button
+//                         className='bg-black text-primary-light p-2 rounded-[8px] mt-4'
+//                         type="submit"
+//                     >
+//                         Sign in
+//                     </button>
+//                 </form>
+
+//                 <div className="hidden md:flex items-center justify-center bg-[#FFE5D0]">
+//                 {/* right */}
+//                 </div>
+//                 <img
+//                     src="https://cdn3d.iconscout.com/3d/premium/thumb/cute-bird-in-orange-dress-3d-illustration-download-in-png-blend-fbx-gltf-file-formats--character-mascot-pack-animals-illustrations-3733947.png"
+//                     alt="Illustration"
+//                     className="max-w-sm"
+//                 />
+//                 </div>
+//             </div>
+//         </div>
