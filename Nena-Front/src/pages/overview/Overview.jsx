@@ -16,86 +16,102 @@ export const Overview = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState({});
 
-  // candy 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const decodedToken = jwtDecode(token);
-      const userId = decodedToken.sub;
+    const refreshToken = localStorage.getItem('refreshToken');
+
+    // Only fetch if user is authenticated
+    if (!token || !refreshToken) {
+      setLoading(false);
+      return;
+    }
+
+    let userId;
+    try {
+      const decodedToken = jwtDecode(token);
+      userId = decodedToken.sub;
+    } catch (error) {
+      setLoading(false);
+      return;
+    }
 
     const fetchData = async () => {
-    try {
-      // fetch modes
-      const response1 = await fetch("http://127.0.0.1:5000/modes", {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      const data1 = await response1.json();
-      setMode(data1);
+      try {
+        // fetch modes
+        const response1 = await fetch("http://127.0.0.1:5000/modes", {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data1 = await response1.json();
+        setMode(data1);
 
-      // Activity log
-      const response2 = await fetch("http://127.0.0.1:5000/activity_logs", {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      
-      const data2 = await response2.json();
-      
-      const response3 = await fetch(`http://127.0.0.1:5000/userById/${userId}`, {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      
-      const data3 = await response3.json();
-      setActivity_log(data2);
-      setUser(data3);
+        // Activity log
+        const response2 = await fetch("http://127.0.0.1:5000/activity_logs", {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
 
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        const data2 = await response2.json();
 
-  // Fetch next practice (9h - continue block)
-  const fetchNextPractice = async () => {
-    setNextPracticeLoading(true);
-    try {
-      const response = await api.get('/next-practice');
-      setNextPractice(response.data);
-    } catch (err) {
-      console.error('Failed to load next practice:', err);
-    } finally {
-      setNextPracticeLoading(false);
-    }
-  };
+        const response3 = await fetch(`http://127.0.0.1:5000/userById/${userId}`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
 
-  // Fetch trends (9j - sparklines)
-  const fetchTrends = async () => {
-    setTrendsLoading(true);
-    try {
-      const response = await api.get('/trends');
-      setTrends(response.data);
-    } catch (err) {
-      console.error('Failed to load trends:', err);
-    } finally {
-      setTrendsLoading(false);
-    }
-  };
+        const data3 = await response3.json();
+        setActivity_log(data2);
+        setUser(data3);
 
-  // Fetch recordings for count check (9j - gating)
-  const fetchRecordings = async () => {
-    try {
-      const response = await fetch('http://127.0.0.1:5000/recordings', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      setRecordings(data);
-    } catch (err) {
-      console.error('Failed to load recordings:', err);
-    }
-  };
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  fetchData();
-  fetchNextPractice();
-  fetchTrends();
-  fetchRecordings();
+    // Fetch next practice (9h - continue block)
+    const fetchNextPractice = async () => {
+      setNextPracticeLoading(true);
+      try {
+        const response = await api.get('/next-practice');
+        setNextPractice(response.data);
+      } catch (err) {
+        // Silently fail if not authenticated
+        setNextPractice(null);
+      } finally {
+        setNextPracticeLoading(false);
+      }
+    };
+
+    // Fetch trends (9j - sparklines)
+    const fetchTrends = async () => {
+      setTrendsLoading(true);
+      try {
+        const response = await api.get('/trends');
+        setTrends(response.data);
+      } catch (err) {
+        // Silently fail if not authenticated
+        setTrends(null);
+      } finally {
+        setTrendsLoading(false);
+      }
+    };
+
+    // Fetch recordings for count check (9j - gating)
+    const fetchRecordings = async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:5000/recordings', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        setRecordings(data);
+      } catch (err) {
+        // Silently fail if not authenticated
+        setRecordings([]);
+      }
+    };
+
+    fetchData();
+    fetchNextPractice();
+    fetchTrends();
+    fetchRecordings();
   }, []);
 
     return (
