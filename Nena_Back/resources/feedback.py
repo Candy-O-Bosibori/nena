@@ -101,6 +101,69 @@ class FeedbackResource(Resource):
     def _compute_long_pauses(self, transcription):
         return 0
 
+    def _compute_next_topic(self, user_id, recording, coaching_data):
+        """Compute recommended next topic based on focus area.
+
+        Strategy:
+        1. If coaching succeeded, use its focus_area
+        2. Otherwise, look at last 5 feedbacks for most common focus_area
+        3. Select a topic matching that focus_area (in tags), same mode
+        4. Exclude topics practiced in last 30 days
+        """
+        from datetime import datetime, timedelta, timezone
+        from sqlalchemy import func
+
+        focus_area = None
+
+        # Priority 1: Use current feedback's focus_area if available
+        if coaching_data and coaching_data.get("focus_area"):
+            focus_area = coaching_data.get("focus_area")
+
+        # Priority 2: Look at last 5 feedbacks for most common focus_area
+        if not focus_area:
+            last_5 = (
+                Feedback.query.join(Recording)
+                .filter(Recording.user_id == user_id)
+                .filter(Feedback.focus_area.isnot(None))
+                .order_by(Feedback.created_at.desc())
+                .limit(5)
+                .all()
+            )
+
+            if last_5:
+                focus_areas = [f.focus_area for f in last_5]
+                # Get most common
+                focus_area = max(set(focus_areas), key=focus_areas.count)
+
+        if not focus_area:
+            return None  # No focus area to target
+
+        # Find topics matching this focus_area in the same mode
+        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+
+        # Get topics with focus_area in tags, same mode, not practiced recently
+        candidate_topics = (
+            Topic.query.filter(
+                Topic.mode_id == recording.mode_id,
+                Topic.active == True,
+                Topic.tags.contains([focus_area])  # JSON containment
+            )
+            .filter(
+                ~Topic.id.in_(
+                    db.session.query(Recording.topic_id)
+                    .filter(
+                        Recording.user_id == user_id,
+                        Recording.created_at >= thirty_days_ago,
+                        Recording.topic_id.isnot(None)
+                    )
+                )
+            )
+            .order_by(func.random())
+            .first()
+        )
+
+        return candidate_topics.id if candidate_topics else None
+
     @jwt_required()
     def post(self, recording_id):
         user_id = get_jwt_identity()
@@ -190,6 +253,11 @@ class FeedbackResource(Resource):
             feedback.strongest_moment = coaching_data.get("strongest_moment")
             feedback.coach_notes = coaching_data.get("coach_notes")
             feedback.framework_adherence = coaching_data.get("framework_adherence")
+
+        # Compute next_topic_id based on focus_area
+        next_topic_id = self._compute_next_topic(user_id, recording, coaching_data)
+        if next_topic_id:
+            feedback.next_topic_id = next_topic_id
 
         db.session.add(feedback)
         db.session.commit()

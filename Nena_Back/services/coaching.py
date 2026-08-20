@@ -6,6 +6,61 @@ from datetime import datetime, timezone
 from anthropic import Anthropic
 
 
+def stream_coaching_feedback(transcription, mode, topic_text, framework_slug, metrics_dict):
+    """
+    Stream LLM-based coaching feedback word-by-word to the client.
+
+    Yields text chunks as they arrive from Claude, allowing real-time display.
+    After streaming completes, yields the final parsed JSON as a dict.
+
+    Yields:
+        str: Text chunks as they arrive
+        dict: Final parsed coaching data at the end
+    """
+    if not transcription or not transcription.strip():
+        return
+
+    try:
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            return
+
+        client = Anthropic(api_key=api_key)
+
+        prompt = _build_coaching_prompt(
+            transcription=transcription,
+            mode_name=mode.get("name") if isinstance(mode, dict) else mode.name,
+            topic_text=topic_text,
+            framework_slug=framework_slug,
+            metrics_dict=metrics_dict
+        )
+
+        # Stream the response
+        response_text = ""
+        with client.messages.stream(
+            model="claude-sonnet-5",
+            max_tokens=1500,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        ) as stream:
+            for text in stream.text_stream:
+                response_text += text
+                yield text  # ← Yield chunks as they arrive
+
+        # Parse and yield final JSON
+        coaching_data = _parse_coaching_response(response_text)
+        if coaching_data is not None:
+            yield coaching_data  # ← Yield final parsed dict
+
+    except Exception as e:
+        print(f"LLM coaching failed (graceful fallback): {e}")
+        return
+
+
 def get_coaching_feedback(transcription, mode, topic_text, framework_slug, metrics_dict):
     """
     Generate LLM-based coaching feedback for a recording.

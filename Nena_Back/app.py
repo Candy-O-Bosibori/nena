@@ -32,7 +32,7 @@ jwt.init_app(app)
 api = Api(app)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-from resources import auth, users, modes, topics, recordings, activity_logs, feedback, words
+from resources import auth, users, modes, topics, recordings, activity_logs, feedback, words, coaching_stream, adaptive_selection, frameworks
 
 auth.register(api)
 users.register(api)
@@ -42,6 +42,9 @@ recordings.register(api, app)
 activity_logs.register(api)
 feedback.register(api)
 words.register(api)
+coaching_stream.register(api)
+adaptive_selection.register(api)
+frameworks.register(api)
 
 
 if __name__ == '__main__':
