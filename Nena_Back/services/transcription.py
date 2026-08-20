@@ -6,7 +6,9 @@ import assemblyai as aai
 aai.settings.api_key = os.getenv("ASSEMBLYAI_API_KEY")
 
 
-def extract_audio(video_path, output_dir="static/audio"):
+def extract_audio(video_path, output_dir=None):
+    if output_dir is None:
+        output_dir = "static/audio"
     os.makedirs(output_dir, exist_ok=True)
     audio_path = os.path.join(output_dir, os.path.splitext(os.path.basename(video_path))[0] + ".mp3")
 

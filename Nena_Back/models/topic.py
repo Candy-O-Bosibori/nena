@@ -21,6 +21,5 @@ class Topic(db.Model, SerializerMixin):
 
     # Relationships
     mode = db.relationship('Mode', backref='topics')
-    recordings = db.relationship('Recording', backref='topic')
 
-    serialize_rules = ('-mode.topics', '-recordings.topic')
+    serialize_rules = ('-mode.topics',)

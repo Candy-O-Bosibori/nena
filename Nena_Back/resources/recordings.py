@@ -1,7 +1,8 @@
 import os
-import subprocess
+import shutil
+import tempfile
 
-from flask import request, make_response, send_from_directory
+from flask import request, make_response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restful import Resource
 from werkzeug.utils import secure_filename
@@ -9,10 +10,7 @@ from werkzeug.utils import secure_filename
 from models import db, Recording
 from services.transcription import extract_audio, transcribe_audio, get_video_duration
 
-UPLOAD_FOLDER = 'static/uploads'  # Folder to store videos
 ALLOWED_EXTENSIONS = {'webm', 'mp4', 'mov'}
-
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 def allowed_file(filename):
@@ -38,13 +36,21 @@ class Recordings(Resource):
 
         file = request.files['video']
         mode_id = request.form.get('mode_id')
+        topic_id = request.form.get('topic_id')
+        framework_slug = request.form.get('framework_slug')
 
-        if file and allowed_file(file.filename):
+        if not file or not allowed_file(file.filename):
+            return {"error": "Invalid file format"}, 400
+
+        temp_dir = None
+        try:
+            temp_dir = tempfile.mkdtemp()
+
             filename = secure_filename(file.filename)
-            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            filepath = os.path.join(temp_dir, filename)
             file.save(filepath)
 
-            audio_path = extract_audio(filepath)
+            audio_path = extract_audio(filepath, output_dir=temp_dir)
             transcription = None
             try:
                 transcription = transcribe_audio(audio_path)
@@ -52,19 +58,15 @@ class Recordings(Resource):
                 print(f"Transcription failed: {e}")
                 transcription = None
 
-            mp4_path = os.path.splitext(filepath)[0] + ".mp4"
-            subprocess.run([
-                "ffmpeg", "-i", filepath,
-                "-c:v", "libx264", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-y", mp4_path
-            ], check=True)
-            video_url = f"/{UPLOAD_FOLDER}/{os.path.basename(mp4_path)}"
+            duration_seconds = get_video_duration(filepath)
 
             new_recording = Recording(
-                video_url=video_url,
                 transcription=transcription,
-                duration_minutes=get_video_duration(mp4_path),
+                duration_minutes=duration_seconds,
                 user_id=user_id,
-                mode_id=mode_id
+                mode_id=mode_id,
+                topic_id=topic_id if topic_id else None,
+                framework_slug=framework_slug if framework_slug else None
             )
             try:
                 db.session.add(new_recording)
@@ -76,9 +78,11 @@ class Recordings(Resource):
                 print(f"DB error: {e}")
                 return {"error": "Database insert failed"}, 500
 
-            return {"message": "Recording uploaded successfully", "video_url": video_url}, 201
+            return {"message": "Recording uploaded successfully", "recording_id": new_recording.id}, 201
 
-        return {"error": "Invalid file format"}, 400
+        finally:
+            if temp_dir and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 class RecordingById(Resource):
@@ -97,21 +101,11 @@ class RecordingById(Resource):
         if not recording:
             return {"error": "Recording not found"}, 404
 
-        if recording.video_url:
-            filepath = recording.video_url.lstrip('/')
-            if os.path.exists(filepath):
-                os.remove(filepath)
-
         db.session.delete(recording)
         db.session.commit()
         return {"message": "Recording deleted successfully"}, 200
 
 
-def uploaded_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
-
-
 def register(api, app):
     api.add_resource(Recordings, '/recordings')
     api.add_resource(RecordingById, '/recordingById/<int:recording_id>')
-    app.add_url_rule('/uploads/<path:filename>', 'uploaded_file', uploaded_file)
