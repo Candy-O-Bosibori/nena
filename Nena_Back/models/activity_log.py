@@ -22,7 +22,7 @@ class ActivityLog(db.Model, SerializerMixin):
         recordings_today = Recording.query.filter_by(user_id=self.user_id).filter(
             db.func.date(Recording.created_at) == self.date
         ).all()
-        total_minutes = sum([r.duration_minutes for r in recordings_today])
-        self.time_spent_minutes = total_minutes
+        total_seconds = sum([r.duration_minutes for r in recordings_today])  # duration_minutes stores seconds
+        self.time_spent_minutes = int(total_seconds / 60)  # Convert seconds to minutes (9k)
 
     serialize_rules = ('-user.activity_logs',)
