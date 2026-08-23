@@ -1,6 +1,7 @@
 from flask import request, jsonify
 from flask_jwt_extended import (
-    jwt_required, get_jwt_identity, create_access_token, create_refresh_token
+    jwt_required, get_jwt_identity, create_access_token, create_refresh_token,
+    decode_token
 )
 from flask_restful import Resource
 
@@ -31,14 +32,57 @@ class SignIn(Resource):
 
 
 class TokenRefresh(Resource):
-    @jwt_required(refresh=True)
+    """Exchange a refresh token for a fresh access token.
+
+    Accepts the refresh token either as `Authorization: Bearer <token>` or in the
+    JSON body as {"token": ...} / {"refresh_token": ...}, so any client shape works.
+
+    Returns the new access token under several key names for the same reason, and
+    rotates the refresh token so a user who keeps using the app never expires.
+    """
+
     def post(self):
+        identity = None
+
+        # 1. Authorization header (standard flask-jwt-extended form)
+        auth_header = request.headers.get("Authorization", "")
+        raw_token = None
+        if auth_header.startswith("Bearer "):
+            raw_token = auth_header.split(" ", 1)[1].strip()
+
+        # 2. JSON body fallback
+        if not raw_token:
+            body = request.get_json(silent=True) or {}
+            raw_token = body.get("token") or body.get("refresh_token")
+
+        if not raw_token:
+            return {"error": "Missing refresh token"}, 401
+
         try:
-            current_user = get_jwt_identity()
-            access_token = create_access_token(identity=current_user)
-            return {'access_token': access_token}, 200
-        except Exception as e:
-            return jsonify(error=str(e)), 500
+            decoded = decode_token(raw_token)
+        except Exception:
+            return {"error": "Invalid or expired refresh token"}, 401
+
+        if decoded.get("type") != "refresh":
+            return {"error": "Expected a refresh token"}, 401
+
+        identity = decoded.get("sub")
+        if not identity:
+            return {"error": "Invalid refresh token"}, 401
+
+        # Confirm the account still exists before minting anything.
+        if not User.query.get(int(identity)):
+            return {"error": "User no longer exists"}, 401
+
+        access_token = create_access_token(identity=str(identity))
+        new_refresh_token = create_refresh_token(identity=str(identity))
+
+        return {
+            "access_token": access_token,
+            "accessToken": access_token,
+            "refresh_token": new_refresh_token,
+            "refreshToken": new_refresh_token,
+        }, 200
 
 
 class SignUp(Resource):

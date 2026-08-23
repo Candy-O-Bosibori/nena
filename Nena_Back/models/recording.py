@@ -24,4 +24,4 @@ class Recording(db.Model, SerializerMixin):
     topic = db.relationship('Topic', backref='recordings')
     feedback = db.relationship('Feedback', back_populates='recording', cascade="all, delete-orphan", uselist=False)
 
-    serialize_rules = ('-user.recordings', '-mode.recordings', '-topic.recordings', '-feedback.recording')
+    serialize_rules = ('-user', '-mode', '-topic', '-feedback')

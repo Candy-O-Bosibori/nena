@@ -14,7 +14,7 @@ class Topics(Resource):
     def get(self):
         """Get all active topics"""
         topics = Topic.query.filter_by(active=True).all()
-        response_dict = [t.to_dict(rules=('-mode.topics', '-recordings.topic')) for t in topics]
+        response_dict = [t.to_dict() for t in topics]
         return make_response(response_dict, 200)
 
 
@@ -61,7 +61,7 @@ class TopicsRandom(Resource):
         if not topic:
             return {"error": "No matching topics found"}, 404
 
-        return make_response(topic.to_dict(rules=('-mode.topics', '-recordings.topic')), 200)
+        return make_response(topic.to_dict(), 200)
 
 
 class TopicsToday(Resource):
@@ -93,7 +93,7 @@ class TopicsToday(Resource):
 
         topic = topics[index]
 
-        return make_response(topic.to_dict(rules=('-mode.topics', '-recordings.topic')), 200)
+        return make_response(topic.to_dict(), 200)
 
 
 def register(api):

@@ -55,8 +55,8 @@ class NextPractice(Resource):
                     "Targeting: improve your speaking skills"
                 )
                 return make_response({
-                    "topic": topic.to_dict(rules=('-mode.topics',)),
-                    "mode": mode.to_dict(rules=('-topics',)) if mode else None,
+                    "topic": topic.to_dict(),
+                    "mode": mode.to_dict() if mode else None,
                     "reason": reason,
                     "is_random": False
                 }, 200)
@@ -66,8 +66,8 @@ class NextPractice(Resource):
         if random_topic:
             mode = Mode.query.get(random_topic.mode_id)
             return make_response({
-                "topic": random_topic.to_dict(rules=('-mode.topics',)),
-                "mode": mode.to_dict(rules=('-topics',)) if mode else None,
+                "topic": random_topic.to_dict(),
+                "mode": mode.to_dict() if mode else None,
                 "reason": "No specific recommendation yet — here's a random prompt to practice",
                 "is_random": True
             }, 200)
@@ -142,15 +142,22 @@ class Trends(Resource):
             'concreteness_ratio': []
         }
 
+        # func.avg() over an Integer column returns Decimal, which Flask serializes
+        # as a JSON *string* ("1.10"). The frontend then calls .toFixed() on it and
+        # crashes. Coerce every average to a real float so the API always emits
+        # JSON numbers.
+        def num(value):
+            return round(float(value), 2) if value is not None else 0
+
         for row in trends_query:
             trend_dict = {
                 "date": row.date.isoformat() if row.date else None,
-                "pace_wpm_avg": round(row.pace_wpm_avg, 2) if row.pace_wpm_avg else 0,
-                "filler_words_avg": round(row.filler_words_avg, 2) if row.filler_words_avg else 0,
-                "hedge_count_avg": round(row.hedge_count_avg, 2) if row.hedge_count_avg else 0,
-                "time_to_point_seconds_avg": round(row.time_to_point_seconds_avg, 2) if row.time_to_point_seconds_avg else 0,
-                "concreteness_ratio_avg": round(row.concreteness_ratio_avg, 2) if row.concreteness_ratio_avg else 0,
-                "recording_count": row.recording_count or 0,
+                "pace_wpm_avg": num(row.pace_wpm_avg),
+                "filler_words_avg": num(row.filler_words_avg),
+                "hedge_count_avg": num(row.hedge_count_avg),
+                "time_to_point_seconds_avg": num(row.time_to_point_seconds_avg),
+                "concreteness_ratio_avg": num(row.concreteness_ratio_avg),
+                "recording_count": int(row.recording_count or 0),
             }
             trends.append(trend_dict)
 
@@ -167,12 +174,15 @@ class Trends(Resource):
                 all_metrics['concreteness_ratio'].append(row.concreteness_ratio_avg)
 
         # Compute summary (overall average)
+        def avg(values):
+            return round(float(sum(values)) / len(values), 2) if values else 0
+
         summary = {
-            "pace_wpm_avg": round(sum(all_metrics['pace_wpm']) / len(all_metrics['pace_wpm']), 2) if all_metrics['pace_wpm'] else 0,
-            "filler_words_avg": round(sum(all_metrics['filler_words']) / len(all_metrics['filler_words']), 2) if all_metrics['filler_words'] else 0,
-            "hedge_count_avg": round(sum(all_metrics['hedge_count']) / len(all_metrics['hedge_count']), 2) if all_metrics['hedge_count'] else 0,
-            "time_to_point_seconds_avg": round(sum(all_metrics['time_to_point_seconds']) / len(all_metrics['time_to_point_seconds']), 2) if all_metrics['time_to_point_seconds'] else 0,
-            "concreteness_ratio_avg": round(sum(all_metrics['concreteness_ratio']) / len(all_metrics['concreteness_ratio']), 2) if all_metrics['concreteness_ratio'] else 0,
+            "pace_wpm_avg": avg(all_metrics['pace_wpm']),
+            "filler_words_avg": avg(all_metrics['filler_words']),
+            "hedge_count_avg": avg(all_metrics['hedge_count']),
+            "time_to_point_seconds_avg": avg(all_metrics['time_to_point_seconds']),
+            "concreteness_ratio_avg": avg(all_metrics['concreteness_ratio']),
         }
 
         return make_response({

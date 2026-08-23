@@ -23,7 +23,7 @@ class User(db.Model, SerializerMixin):
     words = db.relationship('Word', back_populates='user', cascade="all, delete-orphan")
 
     # serialization rules
-    serialize_rules = ('-recordings.user', '-activity_logs.user', '-words.user')
+    serialize_rules = ('-recordings', '-activity_logs', '-words', '-password')
 
     # validation
     # email

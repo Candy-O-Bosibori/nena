@@ -9,7 +9,9 @@ class Modes(Resource):
     @jwt_required()
     def get(self):
         modes = Mode.query.all()
-        response_dict = [mode.to_dict() for mode in modes]
+        # Opt back into a shallow recordings list; the frontend's stat boxes read
+        # mode.recordings.length. Recording's own rules keep it from nesting further.
+        response_dict = [mode.to_dict(rules=('recordings',)) for mode in modes]
         return make_response(response_dict, 200)
 
 

@@ -44,4 +44,4 @@ class Feedback(db.Model, SerializerMixin):
     recording = db.relationship('Recording', back_populates='feedback')
     next_topic = db.relationship('Topic', foreign_keys=[next_topic_id], backref='feedback_recommendations')
 
-    serialize_rules = ('-recording.feedback', '-next_topic.feedback_recommendations')
+    serialize_rules = ('-recording', '-next_topic')

@@ -9,6 +9,7 @@ class Mode(db.Model, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, unique=True, nullable=False)
     description = db.Column(db.String, nullable=True)
+    explainer = db.Column(db.String, nullable=True)
     slug = db.Column(db.String, unique=True, nullable=False)
     default_timer_seconds = db.Column(db.Integer, nullable=True)
     accent_color = db.Column(db.String, nullable=False)
@@ -17,4 +18,7 @@ class Mode(db.Model, SerializerMixin):
     # Relationships
     recordings = db.relationship('Recording', back_populates='mode')
 
-    serialize_rules = ('-recordings.mode',)
+    # Relationships are opt-in per endpoint: serializing them by default reopens
+    # cycles (mode -> topics -> recordings -> user -> recordings -> ...) that
+    # one-level-deep rules cannot close.
+    serialize_rules = ('-recordings', '-topics')

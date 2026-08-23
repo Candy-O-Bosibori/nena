@@ -29,7 +29,15 @@ migrate = Migrate(app, db)
 db.init_app(app)
 bcrypt.init_app(app)
 jwt.init_app(app)
+
+# flask-restful replaces Flask's error handling, which swallows flask-jwt-extended's
+# 401 responses and turns an expired token into a 500. That breaks the client's
+# refresh-on-401 retry and logs the user out. Keep Flask's own handlers so JWT
+# errors surface as 401 and the session can be refreshed transparently.
 api = Api(app)
+app.handle_exception = Flask.handle_exception.__get__(app, Flask)
+app.handle_user_exception = Flask.handle_user_exception.__get__(app, Flask)
+
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 from resources import auth, users, modes, topics, recordings, activity_logs, feedback, words, coaching_stream, adaptive_selection, frameworks

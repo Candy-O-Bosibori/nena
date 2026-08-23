@@ -25,4 +25,4 @@ class ActivityLog(db.Model, SerializerMixin):
         total_seconds = sum([r.duration_minutes for r in recordings_today])  # duration_minutes stores seconds
         self.time_spent_minutes = int(total_seconds / 60)  # Convert seconds to minutes (9k)
 
-    serialize_rules = ('-user.activity_logs',)
+    serialize_rules = ('-user',)

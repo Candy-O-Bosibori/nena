@@ -1,8 +1,11 @@
 import re
+from datetime import datetime, timedelta, timezone
 
 from flask import make_response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restful import Resource
+from sqlalchemy import cast, func
+from sqlalchemy.dialects.postgresql import JSONB
 
 from models import db, Recording, Feedback, Word, Mode, Topic
 from services.coaching import get_coaching_feedback
@@ -142,11 +145,14 @@ class FeedbackResource(Resource):
         thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
 
         # Get topics with focus_area in tags, same mode, not practiced recently
+        # Topic.tags is a plain `json` column; .contains() would compile to LIKE,
+        # which Postgres rejects ("operator does not exist: json ~~ text").
+        # Cast to jsonb so the real containment operator (@>) is used.
         candidate_topics = (
             Topic.query.filter(
                 Topic.mode_id == recording.mode_id,
                 Topic.active == True,
-                Topic.tags.contains([focus_area])  # JSON containment
+                cast(Topic.tags, JSONB).contains([focus_area])
             )
             .filter(
                 ~Topic.id.in_(
@@ -167,10 +173,21 @@ class FeedbackResource(Resource):
     @jwt_required()
     def post(self, recording_id):
         user_id = get_jwt_identity()
+        feedback = self.generate_for_recording(recording_id, user_id)
+        if feedback is None:
+            return make_response({"error": "Recording not found"}, 404)
+        return make_response(feedback.to_dict(), 201)
 
+    def generate_for_recording(self, recording_id, user_id):
+        """Build and persist Feedback for a recording.
+
+        Plain method (no @jwt_required, no get_jwt_identity) so the upload path in
+        resources/recordings.py can call it directly. Returns the Feedback row, or
+        None if the recording doesn't belong to this user.
+        """
         recording = Recording.query.filter_by(id=recording_id, user_id=user_id).first()
         if not recording:
-            return make_response({"error": "Recording not found"}, 404)
+            return None
 
         transcription = recording.transcription or ""
         duration_seconds = recording.duration_minutes or 1
@@ -262,7 +279,7 @@ class FeedbackResource(Resource):
         db.session.add(feedback)
         db.session.commit()
 
-        return make_response(feedback.to_dict(rules=('-recording',)), 201)
+        return feedback
 
     @jwt_required()
     def get(self, recording_id):
@@ -275,7 +292,7 @@ class FeedbackResource(Resource):
         if not feedback:
             return make_response({"error": "Feedback not found"}, 404)
 
-        return make_response(feedback.to_dict(rules=('-recording',)), 200)
+        return make_response(feedback.to_dict(), 200)
 
 
 def register(api):

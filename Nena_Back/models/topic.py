@@ -22,4 +22,6 @@ class Topic(db.Model, SerializerMixin):
     # Relationships
     mode = db.relationship('Mode', backref='topics')
 
-    serialize_rules = ('-mode.topics',)
+    # `recordings` and `feedback_recommendations` are implicit backrefs; excluded
+    # by default so topics never drag the recording graph along behind them.
+    serialize_rules = ('-mode', '-recordings', '-feedback_recommendations')

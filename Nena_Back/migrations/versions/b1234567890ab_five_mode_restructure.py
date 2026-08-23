@@ -34,13 +34,16 @@ def upgrade():
     # Create unique constraint on slug
     op.create_unique_constraint('uq_modes_slug', 'modes', ['slug'])
 
-    # Insert the 5 new modes
+    # Insert the 5 new modes.
+    # accent_color values are shades of the single brand hue (#DC9750), light to
+    # dark by sort_order -- Nena uses one hue plus tints/shades, not a rainbow
+    # per mode.
     modes_insert = [
-        "INSERT INTO modes (name, description, slug, default_timer_seconds, accent_color, sort_order) VALUES ('Random Topic', 'An opinion or exploration prompt. The general-purpose mode.', 'random-topic', 60, '#F25019', 1)",
-        "INSERT INTO modes (name, description, slug, default_timer_seconds, accent_color, sort_order) VALUES ('Interview Prep', 'Tech interview questions, weighted toward behavioral answers and explaining your own projects.', 'interview-prep', 90, '#BBC53B', 2)",
-        "INSERT INTO modes (name, description, slug, default_timer_seconds, accent_color, sort_order) VALUES ('Learn Vocabulary', 'A word is shown with definition and example sentence; the user must use it naturally in a short spoken answer.', 'learn-vocab', 30, '#EEB300', 3)",
-        "INSERT INTO modes (name, description, slug, default_timer_seconds, accent_color, sort_order) VALUES ('Read Aloud', 'An original passage to read for pace, clarity, and articulation.', 'read-aloud', NULL, '#CC3C0C', 4)",
-        "INSERT INTO modes (name, description, slug, default_timer_seconds, accent_color, sort_order) VALUES ('Daily Reflection', 'One prompt per calendar day, same for the whole day, rotating at local midnight.', 'daily-reflection', 60, '#F58A1F', 5)",
+        "INSERT INTO modes (name, description, slug, default_timer_seconds, accent_color, sort_order) VALUES ('Random Topic', 'An opinion or exploration prompt. The general-purpose mode.', 'random-topic', 60, '#E2A461', 1)",
+        "INSERT INTO modes (name, description, slug, default_timer_seconds, accent_color, sort_order) VALUES ('Interview Prep', 'Tech interview questions, weighted toward behavioral answers and explaining your own projects.', 'interview-prep', 90, '#DC9750', 2)",
+        "INSERT INTO modes (name, description, slug, default_timer_seconds, accent_color, sort_order) VALUES ('Learn Vocabulary', 'A word is shown with definition and example sentence; the user must use it naturally in a short spoken answer.', 'learn-vocab', 30, '#BD7E3E', 3)",
+        "INSERT INTO modes (name, description, slug, default_timer_seconds, accent_color, sort_order) VALUES ('Read Aloud', 'An original passage to read for pace, clarity, and articulation.', 'read-aloud', NULL, '#966333', 4)",
+        "INSERT INTO modes (name, description, slug, default_timer_seconds, accent_color, sort_order) VALUES ('Daily Reflection', 'One prompt per calendar day, same for the whole day, rotating at local midnight.', 'daily-reflection', 60, '#734B27', 5)",
     ]
 
     for insert_stmt in modes_insert:
