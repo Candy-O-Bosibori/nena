@@ -11,7 +11,7 @@ export const Vocab = () => {
   // Fetch words from API
   useEffect(() => {
     const fetchWords = async () => {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token');
       if (!token) return;
 
       try {
@@ -37,7 +37,7 @@ export const Vocab = () => {
   const handleAddWord = async () => {
     if (!newWord.trim()) return;
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     try {
       const response = await fetch('http://127.0.0.1:5000/words', {
         method: 'POST',
@@ -63,7 +63,7 @@ export const Vocab = () => {
 
   // Delete a word
   const handleDeleteWord = async (id) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     try {
       const response = await fetch(`http://127.0.0.1:5000/wordsById/${id}`, {
         method: 'DELETE',
@@ -90,7 +90,7 @@ export const Vocab = () => {
   const handleSaveEdit = async (id) => {
     if (!editingWordText.trim()) return;
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     try {
       const response = await fetch(`http://127.0.0.1:5000/wordsById/${id}`, {
         method: 'PATCH',
@@ -113,14 +113,16 @@ export const Vocab = () => {
   };
 
 return (
-    <div className="">
-      {/* Header */}
-      <div className="bg-[#FFEEE3] border border-[#FFEEE3] rounded-md shadow-md p-4 mb-6">
-        <h1 className="ml-2 font-semibold text-[#F25019] text-2xl md:text-3xl">
-          Vocabulary
-        </h1>
-      </div>
-<div className='p-6 max-w-3xl mx-auto'>
+    <div className="min-h-screen bg-cream">
+      <div className="mx-auto w-full max-w-3xl px-5 py-10">
+        <header className="mb-8">
+          <h1 className="font-display text-3xl font-normal tracking-tight text-ink md:text-4xl">
+            Vocabulary
+          </h1>
+          <p className="mt-2 text-sm text-ink-soft">
+            Words you&rsquo;re learning. We highlight them when you use them in a session.
+          </p>
+        </header>
       {/* Add new word */}
       <div className="flex mb-6 gap-2">
         <input
@@ -128,11 +130,11 @@ return (
           value={newWord}
           onChange={e => setNewWord(e.target.value)}
           placeholder="Enter new word"
-          className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F25019]"
+          className="flex-1 rounded-xl border border-line bg-cream px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted transition-colors focus:border-primary focus:bg-surface focus:outline-none"
         />
         <button
           onClick={handleAddWord}
-          className="bg-[#F25019] text-white px-4 py-2 rounded-md hover:bg-orange-600 transition"
+          className="rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all duration-200 hover:bg-primary-hover active:scale-[0.98] focus-ring"
         >
           Add
         </button>
@@ -143,7 +145,7 @@ return (
         {words.map(word => (
           <li
             key={word.id}
-            className="flex items-center justify-between bg-white p-3 rounded-md shadow hover:shadow-lg transition"
+            className="flex items-center justify-between rounded-xl border border-line bg-surface p-3.5 transition-all duration-200 hover:border-ink-muted/40 hover:shadow-sm"
           >
             {editingWordId === word.id ? (
               <>
@@ -151,18 +153,18 @@ return (
                   type="text"
                   value={editingWordText}
                   onChange={e => setEditingWordText(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F25019]"
+                  className="flex-1 rounded-lg border border-line bg-cream px-3 py-2 text-sm text-ink transition-colors focus:border-primary focus:bg-surface focus:outline-none"
                 />
                 <div className="flex gap-2 ml-4">
                   <button
                     onClick={() => handleSaveEdit(word.id)}
-                    className="text-green-500 hover:text-green-700"
+                    className="text-primary hover:text-primary-hover"
                   >
                     <FaCheck />
                   </button>
                   <button
                     onClick={() => setEditingWordId(null)}
-                    className="text-red-500 hover:text-red-700"
+                    className="text-danger hover:opacity-80"
                   >
                     <FaTimes />
                   </button>
@@ -170,17 +172,17 @@ return (
               </>
             ) : (
               <>
-                <span className="text-gray-800 font-medium">{word.word}</span>
+                <span className="font-semibold text-ink">{word.word}</span>
                 <div className="flex gap-3">
                   <button
                     onClick={() => handleEditWord(word)}
-                    className="text-blue-500 hover:text-blue-700"
+                    className="text-secondary hover:text-secondary-hover"
                   >
                     <FaEdit />
                   </button>
                   <button
                     onClick={() => handleDeleteWord(word.id)}
-                    className="text-red-500 hover:text-red-700"
+                    className="text-danger hover:opacity-80"
                   >
                     <FaTrash />
                   </button>

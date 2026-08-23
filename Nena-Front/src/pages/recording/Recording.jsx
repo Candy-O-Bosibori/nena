@@ -125,7 +125,7 @@ const submitRecording = async () => {
   }
 
   setSubmitting(true);
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("access_token");
 
   // Use the final blob (guaranteed complete)
   const blob = recordedChunks[0];
@@ -166,8 +166,8 @@ return (
 
   {/* Recording / Header */}
   <div className="">
-    <div className="bg-[#FFEEE3] border border-[#FFEEE3]   ">
-     <h1 className=" ml-8 font-semibold text-[#F25019] text-xl my-6 text-lg md:text-xl  text-[#F25019] ">
+    <div className="bg-surface border border-line">
+     <h1 className="ml-8 font-semibold text-ink text-lg md:text-xl my-6">
        {modeName || "Recording"}
      </h1>
      </div>
@@ -192,16 +192,16 @@ return (
          {recording && (
            <button
              onClick={paused ? resumeRecording : pauseRecording}
-             className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg border-4 border-white bg-white"
+             className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg border-4 border-surface bg-surface"
            >
              {paused ? (
                // Resume ▶
-               <div className="w-0 h-0 border-l-[20px] border-l-[#8F8D8D] border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent"></div>
+               <div className="w-0 h-0 border-l-[20px] border-l-ink-muted border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent"></div>
              ) : (
                // Pause ⏸
                <div className="flex gap-1">
-                 <div className="w-2 h-6 bg-[#8F8D8D]"></div>
-                 <div className="w-2 h-6 bg-[#8F8D8D]"></div>
+                 <div className="w-2 h-6 bg-ink-muted"></div>
+                 <div className="w-2 h-6 bg-ink-muted"></div>
                </div>
              )}
            </button>
@@ -211,14 +211,14 @@ return (
        <div className="flex justify-center w-1/3">
          <button
            onClick={recording ? stopRecording : startRecording}
-           className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg border-4 border-white bg-white"
+           className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg border-4 border-surface bg-surface"
          >
            {recording ? (
              // Stop ⏹
-             <div className="w-10 h-10 bg-red-600 rounded"></div>
+             <div className="w-10 h-10 bg-danger rounded"></div>
            ) : (
              // Start 🔴
-             <div className="w-12 h-12 bg-red-600 rounded-full"></div>
+             <div className="w-12 h-12 bg-danger rounded-full"></div>
            )}
          </button>
        </div>
@@ -230,12 +230,12 @@ return (
                
                <CiTrash
   onClick={deleteRecording}
-  className="w-10 h-10 text-gray-500 hover:text-red-600 cursor-pointer ml-5"
+  className="w-10 h-10 text-ink-muted hover:text-danger cursor-pointer ml-5"
 />
              <button
                onClick={submitRecording}
                disabled={submitting}
-               className="px-4 py-2 bg-[#F25019] text-white hover:bg-white hover:text-[#F25019] rounded-lg shadow  font-bold"
+               className="px-4 py-2 bg-primary text-on-primary hover:bg-primary-hover rounded-lg shadow font-bold transition-colors"
              >
                {submitting ? "Submitting..." : "Submit"}
              </button>
@@ -247,23 +247,23 @@ return (
 </div>
 {showModal && (
   <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
-    <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full text-center">
-      <h2 className="text-xl font-semibold mb-4">🎉 Submission Successful</h2>
-      <p className="mb-4">Would you like to see the feedback on your video!</p>
+    <div className="bg-surface p-6 rounded-lg shadow-lg max-w-sm w-full text-center">
+      <h2 className="text-xl font-semibold mb-4 text-ink">🎉 Submission Successful</h2>
+      <p className="mb-4 text-ink-soft">Would you like to see the feedback on your video!</p>
       <div className="flex justify-center gap-4">
         <button
           onClick={() => {
               setShowModal(false);
               navigate("/overview"); // <-- replace with your actual route
             }}
-          
-          className="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400"
+
+          className="px-4 py-2 bg-secondary-soft text-ink rounded-lg hover:bg-secondary/40 transition-colors"
         >
           Close
         </button>
         <button
           onClick={() => navigate("/feedback")}
-          className="px-4 py-2 bg-[#F25019] text-white rounded-lg hover:bg-white hover:text-[#F25019]"
+          className="px-4 py-2 bg-primary text-on-primary rounded-lg hover:bg-primary-hover transition-colors"
         >
           View Feedback
         </button>

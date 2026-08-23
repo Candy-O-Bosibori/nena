@@ -4,6 +4,35 @@ import { Dialog } from "@headlessui/react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from 'jwt-decode';
 import api from "../../api/api";
+import { fmt, fmtInt, fmtPercent } from "../../utils/format";
+import Button from "../../Components/ui/Button";
+
+// coach_notes arrives as {opening, clarity, evidence, conclusion}. List the known
+// keys so they render in a sensible order, then append any others the model adds
+// rather than silently dropping them.
+const COACH_NOTE_ORDER = ["opening", "clarity", "evidence", "conclusion"];
+
+const orderedCoachNotes = (notes) => {
+  if (!notes || typeof notes !== "object") return [];
+  const known = COACH_NOTE_ORDER.filter((k) => notes[k]);
+  const extra = Object.keys(notes).filter(
+    (k) => !COACH_NOTE_ORDER.includes(k) && notes[k]
+  );
+  return [...known, ...extra];
+};
+
+// framework_adherence arrives as {step_1: "weak"|"medium"|"strong", ...}.
+const ADHERENCE_STYLES = {
+  strong: "bg-primary text-on-primary",
+  medium: "bg-primary-200 text-primary-700",
+  weak: "border border-line text-ink-muted",
+};
+
+const frameworkSteps = (adherence) => {
+  if (!adherence || typeof adherence !== "object") return [];
+  if (Array.isArray(adherence)) return [];
+  return Object.entries(adherence).filter(([, rating]) => rating);
+};
 
 export const Feedback = () => {
   const [recordings, setRecordings] = useState([]);
@@ -15,7 +44,7 @@ export const Feedback = () => {
   const navigate = useNavigate();
 
  useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     const decodedToken = jwtDecode(token);
     const userId = decodedToken.sub.id;
 
@@ -62,7 +91,7 @@ export const Feedback = () => {
     }, []);
 
     const handleDeleteRecording = async (id) => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("access_token");
   try {
     const response = await fetch(`http://127.0.0.1:5000/recordingById/${id}`, {
       method: "DELETE",
@@ -100,51 +129,75 @@ const recordingsByDate = recordings
   }, {});
 
 
-  // Mode colors
-  const modeColors = {
-    "Explain a Concept": "bg-[#F25019] text-white shadow-lg shadow-[#F25019]/40",
-    "Read Aloud": "bg-[#BBC53B] text-white hadow-lg shadow-[#BBC53B]/40",
-    "Tell A Story": "bg-[#EEB300] text-white shadow-lg shadow-[#FFC107]/40",
-    "Random Word": "bg-[#CC3C0C]/80 text-white shadow-lg shadow-[#CC3C0C]/40",
-  };
-
   return (
-    <div className="flex-1 p-7 bg-[#fffaf7] overflow-y-auto">
-      <h1 className="text-xl bg-[#FFEEE3] -m-7 p-6 text-[#F25019] font-semibold mb-6">Feed Back</h1>
+    <div className="min-h-screen flex-1 overflow-y-auto bg-cream">
+      <div className="mx-auto w-full max-w-4xl px-5 py-10">
+        <header className="mb-8">
+          <h1 className="font-display text-3xl font-normal tracking-tight text-ink md:text-4xl">
+            Your feedback
+          </h1>
+          <p className="mt-2 text-sm text-ink-soft">
+            Every session you’ve recorded, with delivery notes and coaching.
+          </p>
+        </header>
 
       {/* Empty State */}
       {recordings.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <p className="text-lg text-gray-600 mb-4">
-            You have no videos yet, therefore we can’t give feedback.
+        <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-line bg-surface/60 py-20 text-center">
+          <p className="mb-1 text-base font-semibold text-ink">No sessions yet</p>
+          <p className="mb-6 max-w-xs text-sm text-ink-soft">
+            Record your first practice and your feedback will show up here.
           </p>
-          <button
-            onClick={() => navigate("/overview")}
-            className="px-6 py-2 bg-orange-500 text-white rounded-lg shadow-md hover:bg-orange-600"
-          >
-            Go to Overview
-          </button>
+          <Button onClick={() => navigate("/overview")}>Start practising</Button>
         </div>
       ) : (
         Object.entries(recordingsByDate).map(([date, recs]) => (
-          <div key={date} className="mb-5">
-            <h2 className="text-lg font-semibold ">{date}</h2>
-            {/* Horizontal scroll for video cards */}
-            <div className="flex gap-4 overflow-x-auto pb-2">
-              {recs.map((rec) => (
-                <div
-                  key={rec.id}
-                  className={`md:max-w-[500px] min-h-[150px] max-w-full p-4 md:p-6 rounded-2xl shadow-md cursor-pointer flex-shrink-0 ${modeColors[rec.mode.name] || "bg-gray-300"}`}
-                  onClick={() => setSelectedRecording(rec)}
-                >
-                  <h3 className="font-semibold text-lg">{rec.mode.name}</h3>
-                  <p className="text-sm opacity-90">{rec.mode.description}</p>
-                </div>
-              ))}
+          <div key={date} className="mb-9">
+            <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
+              {date}
+            </h2>
+            <div className="scroll-slim flex gap-4 overflow-x-auto pb-2">
+              {recs.map((rec) => {
+                const tint = rec.mode?.accent_color || "#DC9750";
+                const hasFeedback = Boolean(rec.feedback);
+                return (
+                  <button
+                    key={rec.id}
+                    onClick={() => setSelectedRecording(rec)}
+                    className="group w-[280px] shrink-0 rounded-2xl border border-line bg-surface p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-transparent hover:shadow-lg focus-ring"
+                  >
+                    <span
+                      className="mb-3 block h-1.5 w-10 rounded-full"
+                      style={{ backgroundColor: tint }}
+                    />
+                    <h3 className="text-base font-bold text-ink">
+                      {rec.mode?.name || "Practice"}
+                    </h3>
+                    <p className="mt-1 line-clamp-2 text-sm text-ink-soft">
+                      {rec.transcription || rec.mode?.description || "No transcript"}
+                    </p>
+                    <div className="mt-4 flex items-center gap-2 text-[11px] font-semibold text-ink-muted">
+                      {hasFeedback ? (
+                        <>
+                          <span style={{ color: tint }}>
+                            {fmtInt(rec.feedback.pace_wpm, "0")} wpm
+                          </span>
+                          <span className="text-line">|</span>
+                          <span>{rec.feedback.filler_words ?? 0} fillers</span>
+                        </>
+                      ) : (
+                        <span>Awaiting analysis</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))
       )}
+
+      </div>
 
       {/* Modal */}
       <Dialog
@@ -152,17 +205,17 @@ const recordingsByDate = recordings
         onClose={() => setSelectedRecording(null)}
         className="relative z-50"
       >
-        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 bg-ink/40 backdrop-blur-sm" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center ">
-          <Dialog.Panel className="bg-white rounded-xl  w-full max-w-3xl shadow-lg">
+          <Dialog.Panel className="w-full max-w-3xl overflow-hidden rounded-3xl bg-surface shadow-2xl">
             {selectedRecording && (
               <>
               <div className='flex h-[70vh]'>
                 <div className='py-6  overflow-auto pl-6 flex-1 min-w-[400px] md:w-4/6'>
                 <div className="flex  justify-between items-center mb-4">
-                  <h2 className="text-xl  font-semibold">
-                    {selectedRecording.mode.name}.
-                    <span className="ml-2 text-gray-500 text-sm">
+                  <h2 className="font-display text-xl font-normal tracking-tight text-ink">
+                    {selectedRecording.mode?.name || "Practice"}.
+                    <span className="ml-2 text-sm font-medium text-ink-muted">
                       {new Date(selectedRecording.created_at).toLocaleDateString("en-US", {
                         weekday: "long",
                         day: "numeric",
@@ -181,8 +234,8 @@ const recordingsByDate = recordings
                 )}
 
                 {/* Transcription */}
-                <div className="bg-[#FFEEE3]/40 p-4 rounded-lg text-sm leading-relaxed mb-4">
-                  <h3 className="font-semibold mb-2">Transcription</h3>
+                <div className="mb-4 rounded-2xl border border-line bg-cream p-4 text-sm leading-relaxed text-ink-soft">
+                  <h3 className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">Transcription</h3>
                   {selectedRecording.transcription ? (
                     <p className="flex flex-wrap gap-1">
                       {selectedRecording.transcription.split(/\s+/).map((word, idx) => {
@@ -199,9 +252,9 @@ const recordingsByDate = recordings
                         const isHedge = hedgeWords.includes(lowerClean);
 
                         let highlightClass = "";
-                        if (isFiller) highlightClass = "bg-red-100 px-1 rounded";
-                        else if (isVocab) highlightClass = "bg-green-100 px-1 rounded";
-                        else if (isHedge) highlightClass = "bg-amber-100 px-1 rounded"; // (9e)
+                        if (isFiller) highlightClass = "bg-red-100 dark:bg-red-950 dark:text-red-300 px-1 rounded";
+                        else if (isVocab) highlightClass = "bg-green-100 dark:bg-green-950 dark:text-green-300 px-1 rounded";
+                        else if (isHedge) highlightClass = "bg-amber-100 dark:bg-amber-950 dark:text-amber-300 px-1 rounded"; // (9e)
 
                         return (
                           <span key={idx} className={highlightClass}>
@@ -216,37 +269,44 @@ const recordingsByDate = recordings
                 </div>
                </div>
                
-                <div className='md:w-2/6 flex flex-col justify-between  rounded-lg ml-5 p-6  bg-[#FFEEE3] overflow-y-auto'>
+                <div className='scroll-slim ml-5 flex w-full flex-col justify-between overflow-y-auto rounded-2xl bg-cream p-6 md:w-2/6'>
+                {/* No analysis yet: say so rather than showing a column of zeroes */}
+                {!selectedRecording.feedback && (
+                  <div className="text-sm text-ink-soft mb-4 pb-4 border-b border-line">
+                    <p className="mb-1 font-semibold text-ink">No analysis for this recording</p>
+                    <p className="text-xs">Feedback wasn't generated when this was submitted, so the metrics below are empty.</p>
+                  </div>
+                )}
                 {/* Feedback Stats (9e) */}
                 <div className="flex flex-col  gap-4 text-sm">
                   {/* Pace */}
                   <div>
                     <div className="flex justify-between items-center">
-                      <span className="font-semibold">Pace</span>
-                      <span className="text-xs text-gray-600">
-                        {trends?.summary?.pace_wpm_avg ? `Avg: ${Math.round(trends.summary.pace_wpm_avg)}` : ''}
+                      <span className="font-semibold text-ink">Pace</span>
+                      <span className="text-xs text-ink-muted">
+                        {fmtInt(trends?.summary?.pace_wpm_avg) && `Avg: ${fmtInt(trends?.summary?.pace_wpm_avg)}`}
                       </span>
                     </div>
-                    <p>{Math.round(selectedRecording.feedback?.pace_wpm || 0)} words/min</p>
+                    <p>{fmtInt(selectedRecording.feedback?.pace_wpm, "0")} words/min</p>
                   </div>
 
                   {/* Filler Words */}
                   <div>
                     <div className="flex justify-between items-center">
                       <span className="font-semibold">Filler Words</span>
-                      <span className="text-xs text-gray-600">
-                        {trends?.summary?.filler_words_avg ? `Avg: ${trends.summary.filler_words_avg.toFixed(1)}` : ''}
+                      <span className="text-xs text-ink-muted">
+                        {fmt(trends?.summary?.filler_words_avg) && `Avg: ${fmt(trends?.summary?.filler_words_avg)}`}
                       </span>
                     </div>
-                    <p>{selectedRecording.feedback?.filler_words}</p>
+                    <p>{selectedRecording.feedback?.filler_words ?? 0}</p>
                   </div>
 
                   {/* Hedges (9e) */}
                   <div>
                     <div className="flex justify-between items-center">
                       <span className="font-semibold">Hedges</span>
-                      <span className="text-xs text-gray-600">
-                        {trends?.summary?.hedge_count_avg ? `Avg: ${trends.summary.hedge_count_avg.toFixed(1)}` : ''}
+                      <span className="text-xs text-ink-muted">
+                        {fmt(trends?.summary?.hedge_count_avg) && `Avg: ${fmt(trends?.summary?.hedge_count_avg)}`}
                       </span>
                     </div>
                     <p>{selectedRecording.feedback?.hedge_count || 0}</p>
@@ -256,35 +316,35 @@ const recordingsByDate = recordings
                   <div>
                     <div className="flex justify-between items-center">
                       <span className="font-semibold">Time to Point</span>
-                      <span className="text-xs text-gray-600">
-                        {trends?.summary?.time_to_point_seconds_avg ? `Avg: ${trends.summary.time_to_point_seconds_avg.toFixed(1)}s` : ''}
+                      <span className="text-xs text-ink-muted">
+                        {fmt(trends?.summary?.time_to_point_seconds_avg) && `Avg: ${fmt(trends?.summary?.time_to_point_seconds_avg)}s`}
                       </span>
                     </div>
-                    <p>{selectedRecording.feedback?.time_to_point_seconds ? `${selectedRecording.feedback.time_to_point_seconds.toFixed(1)}s` : 'N/A'}</p>
+                    <p>{fmt(selectedRecording.feedback?.time_to_point_seconds, 1, "N/A")}{fmt(selectedRecording.feedback?.time_to_point_seconds, 1, "") && "s"}</p>
                   </div>
 
                   {/* Concreteness (9e) */}
                   <div>
                     <div className="flex justify-between items-center">
                       <span className="font-semibold">Concreteness</span>
-                      <span className="text-xs text-gray-600">
-                        {trends?.summary?.concreteness_ratio_avg ? `Avg: ${(trends.summary.concreteness_ratio_avg * 100).toFixed(0)}%` : ''}
+                      <span className="text-xs text-ink-muted">
+                        {fmtPercent(trends?.summary?.concreteness_ratio_avg) && `Avg: ${fmtPercent(trends?.summary?.concreteness_ratio_avg)}%`}
                       </span>
                     </div>
-                    <p>{selectedRecording.feedback?.concreteness_ratio ? `${(selectedRecording.feedback.concreteness_ratio * 100).toFixed(0)}%` : 'N/A'}</p>
+                    <p>{fmtPercent(selectedRecording.feedback?.concreteness_ratio, "N/A")}{fmtPercent(selectedRecording.feedback?.concreteness_ratio, "") && "%"}</p>
                   </div>
 
                   {/* Vocabulary */}
                   <div>
                     <span className="font-semibold">Vocabulary</span>
-                    {selectedRecording.feedback?.vocabulary_list?.length === 0 ? (
-                      <span className="text-gray-600">No new words</span>
+                    {!selectedRecording.feedback?.vocabulary_list?.length ? (
+                      <span className="text-ink-muted">No new words</span>
                     ) : (
                       <div className="flex flex-wrap gap-2 mt-1">
                         {selectedRecording.feedback.vocabulary_list.map((word, idx) => (
                           <span
                             key={idx}
-                            className=" text-green-800 px-2 py-1 rounded-full text-sm bg-green-100"
+                            className=" text-green-800 dark:text-green-300 px-2 py-1 rounded-full text-sm bg-green-100 dark:bg-green-950"
                           >
                             {word}
                           </span>
@@ -296,27 +356,52 @@ const recordingsByDate = recordings
                   {/* Coaching Block (9f) */}
                   {selectedRecording.feedback?.coach_notes && (
                     <div className="border-t pt-3 mt-3">
-                      <p className="font-semibold mb-2 text-[#F25019]">💡 Coaching</p>
-                      <p className="text-xs text-gray-700 mb-2">{selectedRecording.feedback.coach_notes}</p>
+                      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-primary-700">💡 Coaching</p>
+                      {/* coach_notes is a dict of labelled sections
+                          ({opening, clarity, evidence, conclusion}), not a string. */}
+                      {typeof selectedRecording.feedback.coach_notes === "string" ? (
+                        <p className="text-xs text-ink-soft mb-2">
+                          {selectedRecording.feedback.coach_notes}
+                        </p>
+                      ) : (
+                        <div className="flex flex-col gap-2 mb-2">
+                          {orderedCoachNotes(
+                            selectedRecording.feedback.coach_notes
+                          ).map((key) => (
+                            <div key={key}>
+                              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-ink-muted">
+                                {key}
+                              </p>
+                              <p className="text-xs text-ink-soft">
+                                {selectedRecording.feedback.coach_notes[key]}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {selectedRecording.feedback?.strongest_moment && (
-                        <p className="text-xs italic text-gray-600 border-l-2 border-[#F25019] pl-2 mb-2">
+                        <p className="text-xs italic text-ink-muted border-l-2 border-primary pl-2 mb-2">
                           "{selectedRecording.feedback.strongest_moment}"
                         </p>
                       )}
 
-                      {/* Framework Adherence Chips (9f) */}
-                      {selectedRecording.feedback?.framework_adherence && (
+                      {/* Framework Adherence Chips (9f).
+                          Shape is {step_1: "weak"|"medium"|"strong", ...}. */}
+                      {frameworkSteps(selectedRecording.feedback?.framework_adherence)
+                        .length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
-                          {selectedRecording.feedback.framework_adherence.map((step) => (
+                          {frameworkSteps(
+                            selectedRecording.feedback.framework_adherence
+                          ).map(([step, rating]) => (
                             <span
                               key={step}
+                              title={`${step.replace(/_/g, " ")}: ${rating}`}
                               className={`text-xs px-2 py-1 rounded-full ${
-                                step.followed
-                                  ? "bg-[#F25019] text-white"
-                                  : "border border-gray-300 text-gray-600"
+                                ADHERENCE_STYLES[String(rating).toLowerCase()] ||
+                                "border border-line text-ink-muted"
                               }`}
                             >
-                              {step.letter}
+                              {step.replace(/^step_/i, "")} · {rating}
                             </span>
                           ))}
                         </div>
@@ -328,14 +413,14 @@ const recordingsByDate = recordings
                 {/* Next Practice CTA (9g) */}
                 {nextPractice && (
                   <div className="border-t pt-3 mt-3">
-                    <p className="font-semibold mb-2 text-[#F25019]">👉 Continue Practice</p>
-                    <div className="bg-gray-50 rounded p-2 mb-2">
-                      <p className="text-xs font-medium text-gray-800 mb-1">{nextPractice.topic?.text}</p>
-                      <p className="text-xs text-gray-600">{nextPractice.reason}</p>
+                    <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-primary-700">👉 Continue Practice</p>
+                    <div className="bg-cream rounded p-2 mb-2">
+                      <p className="mb-1 text-xs font-semibold text-ink">{nextPractice.topic?.text}</p>
+                      <p className="text-xs text-ink-muted">{nextPractice.reason}</p>
                     </div>
                     <button
                       onClick={() => navigate(`/practice/${nextPractice.mode?.slug}`)}
-                      className="w-full px-3 py-1 bg-[#F25019] text-white rounded text-xs hover:bg-[#CC3C0C] font-medium"
+                      className="w-full px-3 py-1 bg-primary text-on-primary rounded text-xs hover:bg-primary-hover font-medium"
                     >
                       Start Practice
                     </button>
@@ -346,13 +431,13 @@ const recordingsByDate = recordings
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => setSelectedRecording(null)}
-                      className="px-6 py-2 bg-gray-400 text-white rounded-lg shadow-md hover:bg-gray-500"
+                      className="rounded-xl border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:text-ink"
                     >
                       Close
                     </button>
                     <button
                       onClick={() => handleDeleteRecording(selectedRecording.id)}
-                      className="px-6 py-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600"
+                      className="px-6 py-2 bg-danger text-white rounded-lg shadow-md hover:opacity-90 transition-opacity"
                     >
                       Delete
                     </button>

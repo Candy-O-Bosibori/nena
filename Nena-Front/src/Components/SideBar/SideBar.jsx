@@ -1,178 +1,100 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import logo from "../../assets/logo.png";
-import image from "../../assets/image.png";
 import { jwtDecode } from 'jwt-decode';
-import { CiHome } from "react-icons/ci";
-import { CiVideoOn } from "react-icons/ci";
-import { CiViewList } from "react-icons/ci";
-import { CiUser } from "react-icons/ci";
-import { NavLink } from "react-router-dom";
+import api from '../../api/api';
+import { CiHome, CiViewList, CiSettings, CiBookmarkPlus } from "react-icons/ci";
 
+const NAV_ITEMS = [
+  { to: "/overview", label: "Practice", Icon: CiHome },
+  { to: "/feedback", label: "Feedback", Icon: CiViewList },
+  { to: "/vocab", label: "Vocabulary", Icon: CiBookmarkPlus },
+  { to: "/profile", label: "Profile", Icon: CiSettings },
+];
 
 export const SideBar = () => {
-    const navigate = useNavigate();
-    const [employee, setEmployee] = useState(null);
-    
+  const [employee, setEmployee] = useState(null);
 
-    useEffect(() => {
-    const token = localStorage.getItem('token');
-    const decodedToken = jwtDecode(token);
-    const userId = decodedToken.sub.id;
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
 
-    fetch('http://127.0.0.1:5000/users', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-      .then(response => response.json())
-      .then(data => {
-        const user = data.find(user => user.id === userId);
-        setEmployee(user);
+    let userId;
+    try {
+      const decodedToken = jwtDecode(token);
+      userId = decodedToken?.sub?.id ?? decodedToken?.sub;
+    } catch {
+      return; // malformed token: AuthWrapper handles the redirect
+    }
+
+    api.get('/users')
+      .then(({ data }) => {
+        setEmployee(data.find(u => String(u.id) === String(userId)));
       })
       .catch(error => console.error('Error:', error));
-    }, []);
+  }, []);
 
-    const handleLogout = () => {
-  localStorage.removeItem("token");
-  localStorage.removeItem("refreshToken");
-  navigate("/signin");
-};
-
+  const initials = (employee?.name || "")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((n) => n[0]?.toUpperCase())
+    .join("");
 
   return (
-    <div className=' bg-[#FFEEE3] 
-     text-[#8F8D8D] w-full
-     h-[100vh] flex flex-col p-[20px]
-      justify-between  font-body m-0
-       text-center lg:text-left items-center
-        lg:items-start  '>
-      <div className=' ml-10 gap-[50px] '>
-        <div className='mt-10 flex flex-col items-center gap-[20px]'>
-          <img src={logo } alt="logo" className=" w-[130px] max-h-[64px] max-w-full px-4" />
+    <div className="flex h-screen w-full flex-col justify-between border-r border-line bg-cream px-5 py-7">
+      <div>
+        <div className="flex items-center justify-center px-2">
+          <img src={logo} alt="Nena" className="h-9 w-auto object-contain" />
         </div>
-        <div className='flex flex-col gap-[20px] py-[30px] '>
-          
-            
-          <div>
-            <ul className='flex flex-col gap-[25px] my-10'>
-  <li className="relative">
-    <NavLink to="/overview">
-    {({ isActive }) => (
-      <div className={`flex items-center  ${isActive ? "text-[#F25019]" : "text-[#8F8D8D]"} hover:text-[#F25019]`}>
-        <CiHome className="h-5 w-5 mr-5" />
-        <span className="text-[15px]">Overview</span>
 
-        {/* Orange dot, absolutely positioned relative to li */}
-        {isActive && (
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#F25019] hidden md:block "  />
-        )}
+        <nav className="mt-10">
+          <ul className="flex flex-col gap-1">
+            {NAV_ITEMS.map(({ to, label, Icon }) => (
+              <li key={to}>
+                <NavLink to={to} className="block focus-ring rounded-xl">
+                  {({ isActive }) => (
+                    <div
+                      className={[
+                        "flex items-center justify-center gap-3 px-3 py-2.5",
+                        "text-sm transition-colors duration-200",
+                        isActive
+                          ? "text-primary"
+                          : "text-ink-soft hover:text-ink",
+                      ].join(" ")}
+                    >
+                      <Icon className="h-5 w-5 shrink-0" />
+                      <span>{label}</span>
+                    </div>
+                  )}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </div>
-    )}
-  </NavLink>
-  </li>
-  <li className="relative">
-    <NavLink to="/recording">
-    {({ isActive }) => (
-      <div className={`flex items-center  ${isActive ? "text-[#F25019]" : "text-[#8F8D8D]"} hover:text-[#F25019]`}>
-        <CiVideoOn className="h-5 w-5 mr-5" />
-        <span className="text-[15px]">Record</span>
 
-        {/* Orange dot, absolutely positioned relative to li */}
-        {isActive && (
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#F25019] hidden md:block " />
-        )}
-      </div>
-    )}
-  </NavLink>
-  </li>
-  <li className="relative">
-    <NavLink to="/feedback">
-    {({ isActive }) => (
-      <div className={`flex items-center  ${isActive ? "text-[#F25019]" : "text-[#8F8D8D]"} hover:text-[#F25019]`}>
-        <CiViewList className="h-5 w-5 mr-5" />
-        <span className="text-[15px]">Feedback</span>
-
-        {/* Orange dot, absolutely positioned relative to li */}
-        {isActive && (
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#F25019] hidden md:block " />
-        )}
-      </div>
-    )}
-  </NavLink>
-  </li>
-  
-  {/* <li className="relative">
-    <NavLink to="/profile">
-    {({ isActive }) => (
-      <div className={`flex items-center  ${isActive ? "text-[#F25019]" : "text-[#8F8D8D]"} hover:text-[#F25019]`}>
-        <CiUser className="h-5 w-5 mr-5" />
-        <span className="text-[15px]">Profile</span>
-
-        {isActive && (
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#F25019] hidden md:block " />
-        )}
-      </div>
-    )}
-  </NavLink>
-  </li> */}
-
-  <li className="relative">
-    <NavLink to="/vocab">
-    {({ isActive }) => (
-      <div className={`flex items-center  ${isActive ? "text-[#F25019]" : "text-[#8F8D8D]"} hover:text-[#F25019]`}>
-        <CiUser className="h-5 w-5 mr-5" />
-        <span className="text-[15px]">Vocabulary</span>
-
-        {/* Orange dot, absolutely positioned relative to li */}
-        {isActive && (
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#F25019] hidden md:block " />
-        )}
-      </div>
-    )}
-  </NavLink>
-  </li>
-  
-</ul>
+      <div className="flex flex-col gap-3">
+        {employee && (
+          <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-3 py-2.5">
+            {employee.image ? (
+              <img
+                src={employee.image}
+                alt={employee.name}
+                className="h-9 w-9 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-on-primary">
+                {initials || "?"}
+              </span>
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-ink">{employee.name}</p>
+              <p className="truncate text-xs text-ink-muted">{employee.email}</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
-      <div className=' pl-10 p-[5px] flex flex-col gap-[25px] text-center lg:text-left items-center lg:items-start'>
-        <div className=' flex flex-col '>
-            <div>
-                <img src={image} alt="" className='h-52 md:h-32 mb-4' />
-            </div>
-             <div className=" flex flex-col gap-3">
-  <button
-    onClick={handleLogout}
-    className="flex items-center justify-center gap-2 px-4 py-2 bg-[#F25019] text-white rounded-lg shadow-md hover:bg-red-600"
-  >
-    Sign Out
-  </button>
-</div>
-          {/* {employee ? (
-            <div className='flex gap-[15px] p-[10px]'>
-              <div className="w-[50px] h-[50px] overflow-hidden rounded-full">
-                <img src={employee.image} alt={employee.name} className="w-full h-full object-cover" />
-              </div>
-              <div className='flex flex-col gap-[8px]'>
-                <h1 className='text-[16px] font-bold text-Heading dark:text-primary-light'>{employee.name}</h1>
-                <h1 className='text-[11px] font-bold text-Heading dark:text-primary-light'>{employee.department}</h1>
-              </div>
-
-            </div>
-          ) : (
-            <div>
-              <p className='text-secondary text-sm'>Loading...</p>
-            </div>
-          )} */}
-        </div>
-        {/* <div className='flex gap-[30px]'>
-         
-          <button className='bg-secondary text-black hover:cursor-pointer hover:text-white px-[10px] py-[5px] rounded-[5px] text-[15px]' onClick={handleLogout}>Logout</button>
-        </div> */}
-      </div>
-     
     </div>
   );
 }

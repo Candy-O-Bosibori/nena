@@ -5,6 +5,21 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nena</title>
+    <script>
+      // Applied synchronously, before any CSS/React loads, so there is no
+      // flash of the wrong theme on first paint. Mirrors src/theme.js's logic
+      // (kept duplicated here on purpose — this must run with zero imports).
+      (function () {
+        try {
+          var pref = localStorage.getItem("nena-theme") || "system";
+          var dark =
+            pref === "dark" ||
+            (pref === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,224 +1,141 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Details } from "./Details";
 import { jwtDecode } from "jwt-decode";
-import toast from "react-hot-toast";
+import { toast } from "react-toastify";
+import { FiLogOut } from "react-icons/fi";
+import api from "../../api/api";
+import ThemeToggle from "../../Components/ui/ThemeToggle";
 
 export const Profile = () => {
-   const [user, setUser] = useState({});
+  const navigate = useNavigate();
+  const [user, setUser] = useState({});
   const [showNameModal, setShowNameModal] = useState(false);
   const [userNameData, setUsernameData] = useState({ username: "" });
-  const [showContactModal, setShowContactModal] = useState(false);
-  const [contact, setContact] = useState({ contact: "" });
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [email, setEmail] = useState({ email: "" });
-  const [showImageModal, setShowImageModal] = useState(false);
-  const [image, setImage] = useState({ image: "" });
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState({
     current: "",
     newpassword: "",
     confirmpassword: "",
   });
-  const [preview, setPreview] = useState(null);
-  const imageInputRef = useRef();
+  const [submitting, setSubmitting] = useState(false);
+
+  const getUserId = () => {
+    const token = localStorage.getItem("access_token");
+    if (!token) return null;
+    try {
+      const decoded = jwtDecode(token);
+      return decoded?.sub?.id ?? decoded?.sub;
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const decodedToken = jwtDecode(token);
-    const userId = decodedToken.sub;
-    // console.log(token)
-    // console.log(decodedToken)
-    // console.log(userId)
+    const userId = getUserId();
+    if (!userId) return;
 
-    fetch(`http://127.0.0.1:5000/userById/${userId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then((resp) => resp.json())
-      .then((data) => {
-        setUser(data);
-        console.log(data)
-      })
+    api
+      .get(`/userById/${userId}`)
+      .then(({ data }) => setUser(data))
       .catch((err) => {
-        console.log(err);
+        console.error(err);
+        toast.error("Failed to load profile");
       });
   }, []);
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    setImage((prevFormData) => ({ ...prevFormData, image: file }));
-
-    setPreview(URL.createObjectURL(file));
-  };
-
   const handleUsernameChange = (e) => {
     const { id, value } = e.target;
-    setUsernameData((userNameData) => ({ ...userNameData, [id]: value }));
+    setUsernameData((prev) => ({ ...prev, [id]: value }));
   };
 
   const handlePasswordChange = (e) => {
     const { id, value } = e.target;
-    setPassword((passwordData) => ({ ...passwordData, [id]: value }));
-  };
-
-  const handleContactChange = (e) => {
-    const { id, value } = e.target;
-    setContact((userNameData) => ({ ...userNameData, [id]: value }));
+    setPassword((prev) => ({ ...prev, [id]: value }));
   };
 
   const handleEmailChange = (e) => {
     const { id, value } = e.target;
-    setEmail((emailData) => ({ ...emailData, [id]: value }));
+    setEmail((prev) => ({ ...prev, [id]: value }));
   };
-const handleSubmitUsername = (e) => {
+
+  const handleSignOut = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refreshToken");
+    navigate("/signin");
+  };
+
+  const handleSubmitUsername = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem("token");
-    const decodedToken = jwtDecode(token);
-    const userId = decodedToken.sub.id;
+    const userId = getUserId();
+    if (!userId) return;
 
-    const userData = new FormData();
-    userData.append("username", userNameData.username);
-
-    fetch(`http://127.0.0.1:5000/userById/${userId}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-
-      body: userData,
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        setUser(data);
-        setShowNameModal(false);
-        setUsernameData({ username: "" });
-        toast.success("Username successfully Changed");
-      })
-      .catch((error) => {
-        console.error("Error:", error);
+    setSubmitting(true);
+    try {
+      const { data } = await api.patch(`/userById/${userId}`, {
+        name: userNameData.username,
       });
+      setUser(data.user);
+      setShowNameModal(false);
+      setUsernameData({ username: "" });
+      toast.success("Name successfully changed");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to update name");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleSubmitContact = (e) => {
+  const handleSubmitEmail = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem("token");
-    const decodedToken = jwtDecode(token);
-    const userId = decodedToken.sub.id;
+    const userId = getUserId();
+    if (!userId) return;
 
-    const userData = new FormData();
-    userData.append("contact", contact.contact);
-
-    fetch(`http://127.0.0.1:5000/userById/${userId}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-
-      body: userData,
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        setUser(data);
-        setShowContactModal(false);
-        setContact({ contact: "" });
-        toast.success("Contact successfully Changed");
-      })
-      .catch((error) => {
-        console.error("Error:", error);
+    setSubmitting(true);
+    try {
+      const { data } = await api.patch(`/userById/${userId}`, {
+        email: email.email,
       });
+      setUser(data.user);
+      setShowEmailModal(false);
+      setEmail({ email: "" });
+      toast.success("Email successfully changed");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to update email");
+    } finally {
+      setSubmitting(false);
+    }
   };
-    const handleSubmitEmail = (e) => {
+
+  const handleSubmitPassword = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem("token");
-    const decodedToken = jwtDecode(token);
-    const userId = decodedToken.sub.id;
+    const userId = getUserId();
+    if (!userId) return;
 
-    const userData = new FormData();
-    userData.append("email", email.email);
+    if (!password.current) {
+      toast.error("Enter your current password");
+      return;
+    }
+    if (!password.newpassword || password.newpassword !== password.confirmpassword) {
+      toast.error("New password and confirmation must match");
+      return;
+    }
 
-    fetch(`http://127.0.0.1:5000/userById/${userId}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-
-      body: userData,
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        setUser(data);
-        setShowEmailModal(false);
-        setEmail({ email: "" });
-        toast.success("Email successfully Changed");
-      })
-      .catch((error) => {
-        console.error("Error:", error);
+    setSubmitting(true);
+    try {
+      await api.patch(`/userById/${userId}`, {
+        current_password: password.current,
+        newpassword: password.newpassword,
       });
-  };
-
-  const handleSubmitImage = (e) => {
-    e.preventDefault();
-    const token = localStorage.getItem("token");
-    const decodedToken = jwtDecode(token);
-    const userId = decodedToken.sub.id;
-
-    const userData = new FormData();
-    userData.append("image", image.image);
-
-    fetch(`http://127.0.0.1:5000/userById/${userId}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-
-      body: userData,
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        setUser(data);
-        setShowImageModal(false);
-        setImage({ email: "" });
-        toast.success("New image successfully uploaded");
-      })
-      .catch((error) => {
-        console.error("Error:", error);
-      });
-  };
-
-  const handleSubmitPassword = (e) => {
-    e.preventDefault();
-    const token = localStorage.getItem("token");
-    const decodedToken = jwtDecode(token);
-    const userId = decodedToken.sub.id;
-
-    if (
-      password.newpassword == password.confirmpassword &&
-      password.newpassword !== ""
-    ) {
-      const userData = new FormData();
-      userData.append("newpassword", password.newpassword);
-
-      fetch(`http://127.0.0.1:5000/userById/${userId}`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-
-        body: userData,
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          setUser(data);
-          setShowPasswordModal(false);
-          setPassword({ password: "" });
-          toast.success("Password successfully changed");
-        })
-        .catch((error) => {
-          console.error("Error:", error);
-        });
-    } else {
-      toast.error("Confirmed password does not match");
+      setShowPasswordModal(false);
+      setPassword({ current: "", newpassword: "", confirmpassword: "" });
+      toast.success("Password successfully changed");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to change password");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -227,8 +144,8 @@ const handleSubmitUsername = (e) => {
   if (showNameModal) {
     content = (
       <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
-        <div className="bg-white dark:bg-variant1-dark p-4 rounded shadow-lg max-w-full w-[350px] lg:w-[500px]">
-          <h2 className="mb-2 text-2xl  text-center text-Heading dark:text-primary-light">
+        <div className="bg-surface p-4 rounded shadow-lg max-w-full w-[350px] lg:w-[500px]">
+          <h2 className="mb-2 text-center font-display text-2xl font-normal text-ink">
             Change Name
           </h2>
           <form onSubmit={handleSubmitUsername}>
@@ -236,52 +153,20 @@ const handleSubmitUsername = (e) => {
               id="username"
               value={userNameData.username}
               onChange={handleUsernameChange}
-              className="w-full mb-2 p-2 border border-none rounded focus:outline-none bg-gray-200 rounded-lg"
+              className="w-full mb-2 rounded-xl border border-line bg-cream px-4 py-2.5 text-sm text-ink transition-colors focus:border-primary focus:bg-surface focus:outline-none"
             ></textarea>
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                                onClick={() => setShowNameModal(false)}
-                className="bg-gray-200 px-4 py-2 rounded hover:cursor-pointer"
+                onClick={() => setShowNameModal(false)}
+                className="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:text-ink"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className=" bg-[#F25019] text-white px-4 py-2 rounded hover:cursor-pointer"
-              >
-                Submit
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  } else if (showContactModal) {
-    content = (
-      <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
-        <div className="bg-white dark:bg-variant1-dark p-4 rounded shadow-lg max-w-full w-[350px] lg:w-[500px]">
-          <h2 className="mb-2 text-2xl  text-center text-Heading dark:text-primary-light">
-            Change Contact
-          </h2>
-          <form onSubmit={handleSubmitContact}>
-            <textarea
-              id="contact"
-              value={contact.contact}
-              onChange={handleContactChange}
-              className="w-full mb-2 p-2 border dark:border-none rounded focus:outline-none bg-gray-200 rounded-lg dark:bg-primary-dark text-Heading dark:text-primary-light "
-            ></textarea>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowContactModal(false)}
-                className="bg-gray-200 px-4 py-2 rounded hover:cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className=" bg-[#F25019] text-white px-4 py-2 rounded hover:cursor-pointer"
+                disabled={submitting}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-on-primary transition-all duration-200 hover:bg-primary-hover active:scale-[0.98] disabled:opacity-60"
               >
                 Submit
               </button>
@@ -293,8 +178,8 @@ const handleSubmitUsername = (e) => {
   } else if (showEmailModal) {
     content = (
       <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
-        <div className="bg-white dark:bg-variant1-dark p-4 rounded shadow-lg max-w-full w-[350px] lg:w-[500px]">
-          <h2 className="mb-2 text-2xl  text-center text-Heading dark:text-primary-light">
+        <div className="bg-surface p-4 rounded shadow-lg max-w-full w-[350px] lg:w-[500px]">
+          <h2 className="mb-2 text-center font-display text-2xl font-normal text-ink">
             Change Email
           </h2>
           <form onSubmit={handleSubmitEmail}>
@@ -302,62 +187,20 @@ const handleSubmitUsername = (e) => {
               id="email"
               value={email.email}
               onChange={handleEmailChange}
-              className="w-full mb-2 p-2 border dark:border-none rounded focus:outline-none bg-gray-200 rounded-lg dark:bg-primary-dark text-Heading dark:text-primary-light "
+              className="w-full mb-2 rounded-xl border border-line bg-cream px-4 py-2.5 text-sm text-ink transition-colors focus:border-primary focus:bg-surface focus:outline-none"
             ></textarea>
             <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowEmailModal(false)}
-                className="bg-gray-200 px-4 py-2 rounded hover:cursor-pointer"
+                className="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:text-ink"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className=" bg-[#F25019] text-white px-4 py-2 rounded hover:cursor-pointer"
-              >
-                Submit
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  } else if (showImageModal) {
-    content = (
-      <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
-        <div className="bg-white dark:bg-variant1-dark p-4 rounded shadow-lg max-w-full w-[350px] lg:w-[500px]">
-          <h2 className="mb-2 text-2xl  text-center text-Heading dark:text-primary-light">
-            Change image
-          </h2>
-          <form onSubmit={handleSubmitImage}>
-            <input
-              ref={imageInputRef}
-              id="image"
-              type="file"
-              name="image"
-              onChange={handleImageChange}
-              className="w-full px-4 py-2 bg-Primary rounded-md text-sm mb-3  bg-gray-200 rounded-lg text-Variant2 outline-none"
-            />
-            {preview && (
-              <img
-                src={preview}
-                alt="Preview"
-                className="w-full h-64 object-cover mt-4"
-              />
-            )}
-
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowImageModal(false)}
-                className="bg-gray-200 px-4 py-2 rounded hover:cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                               className=" bg-[#F25019] text-white px-4 py-2 rounded hover:cursor-pointer"
+                disabled={submitting}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-on-primary transition-all duration-200 hover:bg-primary-hover active:scale-[0.98] disabled:opacity-60"
               >
                 Submit
               </button>
@@ -369,50 +212,57 @@ const handleSubmitUsername = (e) => {
   } else if (showPasswordModal) {
     content = (
       <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
-        <div className="bg-white dark:bg-variant1-dark p-4 rounded shadow-lg max-w-full w-[350px] lg:w-[500px]">
-          <h2 className="mb-2 text-2xl  text-center text-Heading dark:text-primary-light">
+        <div className="bg-surface p-4 rounded shadow-lg max-w-full w-[350px] lg:w-[500px]">
+          <h2 className="mb-2 text-center font-display text-2xl font-normal text-ink">
             Change Password
           </h2>
           <form onSubmit={handleSubmitPassword}>
-            <label htmlFor="">
+            <label className="block mb-2 text-sm text-ink-soft" htmlFor="current">
               Current Password
               <input
                 id="current"
+                type="password"
+                autoComplete="current-password"
                 value={password.current}
                 onChange={handlePasswordChange}
-                className="w-full mb-2 p-2 border dark:border-none rounded focus:outline-none bg-gray-200 rounded-lg dark:bg-primary-dark text-Heading dark:text-primary-light "
-              ></input>
+                className="w-full mt-1 rounded-xl border border-line bg-cream px-4 py-2.5 text-sm text-ink transition-colors focus:border-primary focus:bg-surface focus:outline-none"
+              />
             </label>
-            <label htmlFor="">
+            <label className="block mb-2 text-sm text-ink-soft" htmlFor="newpassword">
               New Password
               <input
                 id="newpassword"
+                type="password"
+                autoComplete="new-password"
                 value={password.newpassword}
                 onChange={handlePasswordChange}
-                className="w-full mb-2 p-2 border dark:border-none rounded focus:outline-none bg-gray-200 rounded-lg dark:bg-primary-dark text-Heading dark:text-primary-light "
-              ></input>
+                className="w-full mt-1 rounded-xl border border-line bg-cream px-4 py-2.5 text-sm text-ink transition-colors focus:border-primary focus:bg-surface focus:outline-none"
+              />
             </label>
-            <label htmlFor="">
+            <label className="block mb-2 text-sm text-ink-soft" htmlFor="confirmpassword">
               Confirm Password
               <input
                 id="confirmpassword"
+                type="password"
+                autoComplete="new-password"
                 value={password.confirmpassword}
                 onChange={handlePasswordChange}
-                className="w-full mb-2 p-2 border dark:border-none rounded focus:outline-none bg-gray-200 rounded-lg dark:bg-primary-dark text-Heading dark:text-primary-light "
-              ></input>
+                className="w-full mt-1 rounded-xl border border-line bg-cream px-4 py-2.5 text-sm text-ink transition-colors focus:border-primary focus:bg-surface focus:outline-none"
+              />
             </label>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 mt-2">
               <button
                 type="button"
                 onClick={() => setShowPasswordModal(false)}
-                className="bg-gray-200 px-4 py-2 rounded hover:cursor-pointer"
+                className="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:text-ink"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                 className=" bg-[#F25019]text-white px-4 py-2 rounded hover:cursor-pointer"
+                disabled={submitting}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-on-primary transition-all duration-200 hover:bg-primary-hover active:scale-[0.98] disabled:opacity-60"
               >
                 Submit
               </button>
@@ -427,36 +277,47 @@ const handleSubmitUsername = (e) => {
         user={user}
         setShowNameModal={setShowNameModal}
         setShowPasswordModal={setShowPasswordModal}
-        setShowImageModal={setShowImageModal}
         setShowEmailModal={setShowEmailModal}
-        setShowContactModal={setShowContactModal}
       />
     );
   }
 
   return (
-    <div className="h-screen ">
-      <div className="">
+    <div className="min-h-screen bg-cream">
+      <div className="mx-auto w-full max-w-4xl px-5 py-10">
         {/* heading */}
-        <div className="text-xl font-semibold p-7 mb-7 font-body bg-[#FFEEE3] text-[#F25019]  ">Account</div>
-        <div className="flex flex-wrap justify ">
-          <div className=" lg:w-1/4 flex  lg:flex-col  items-center w-full justify-center ">
-            <div className="pl-5  ">
-              <div className="text-Secondary font-body text-center">
-                Welcome!
-              </div>
-              <div className="text-center">{user.name}</div>
+        <header className="mb-8">
+          <h1 className="font-display text-3xl font-normal tracking-tight text-ink md:text-4xl">Your Profile</h1>
+          <p className="mt-2 text-sm text-ink-soft">Manage your profile and preferences.</p>
+        </header>
+
+        <div className="flex flex-col gap-6">
+          <div>{content}</div>
+
+          {/* Preferences */}
+          <div className="rounded-2xl border border-line bg-surface px-5 py-4">
+            <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
+              Preferences
+            </h2>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-ink">Theme</span>
+              <ThemeToggle />
             </div>
-            <div className="rounded-full  border lg:w-52 lg:h-52 mt-5  ml-3">
-              <img
-                className="rounded-full object-cover lg:h-52 lg:w-52 w-32 h-32 "
-                src={user.image}
-                alt=""
-              />
-            </div>
-            
           </div>
-          <div className="lg:w-3/4 mb-4 py-4 w-full ">{content}</div>
+
+          {/* Session */}
+          <div className="rounded-2xl border border-line bg-surface px-5 py-4">
+            <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
+              Session
+            </h2>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-danger transition-colors hover:bg-danger/10 focus-ring"
+            >
+              <FiLogOut className="h-4 w-4" />
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,178 +1,104 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { Disclosure } from "@headlessui/react";
-import { ChevronUpIcon } from "@heroicons/react/20/solid";
 import api from "../../api/api";
+import CircularTimer from "../../Components/CircularTimer/CircularTimer";
+import Button from "../../Components/ui/Button";
 
 export const Practice = () => {
   const { modeSlug } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get topic/mode/framework from router state
+  const { topic: routerTopic, mode: routerMode, selectedFramework } = location.state || {};
 
   const audioRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
+  const timerRef = useRef(null);
+  const streamRef = useRef(null);
 
   const [stream, setStream] = useState(null);
   const [recording, setRecording] = useState(false);
   const [paused, setPaused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [timer, setTimer] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [recordingId, setRecordingId] = useState(null);
-  const [mode, setMode] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [micLabel, setMicLabel] = useState("");
+  // Mirrors recordedChunksRef in React state: mutating a ref's .current
+  // doesn't trigger a re-render, so the Submit/Discard/playback UI needs its
+  // own state to actually show up once a recording has stopped.
+  const [previewUrl, setPreviewUrl] = useState(null);
 
-  // Topic selection state (9b)
-  const [topic, setTopic] = useState(null);
-  const [topicLoading, setTopicLoading] = useState(false);
-  const [difficulty, setDifficulty] = useState("random");
-  const [selectedTags, setSelectedTags] = useState([]);
-  const [topicFading, setTopicFading] = useState(false);
-
-  // Frameworks state (9c)
-  const [frameworks, setFrameworks] = useState([]);
-  const [frameworksLoading, setFrameworksLoading] = useState(false);
-  const [selectedFramework, setSelectedFramework] = useState(null);
-
-  // Read Aloud elapsed time (9d)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  // Load modes and find current mode by slug
+  // Guard: redirect if no router state (direct URL navigation)
   useEffect(() => {
-    const fetchMode = async () => {
-      try {
-        const response = await api.get("/modes");
-        const modes = Array.isArray(response.data) ? response.data : response.data.modes || [];
-        const currentMode = modes.find((m) => m.slug === modeSlug);
-
-        if (!currentMode) {
-          toast.error("Mode not found", { autoClose: 2000, position: "top-center" });
-          setTimeout(() => navigate("/overview"), 2000);
-          return;
-        }
-
-        setMode(currentMode);
-        setTimer(currentMode.default_timer_seconds || 60);
-      } catch (err) {
-        console.error("Failed to load mode:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMode();
-  }, [modeSlug, navigate]);
-
-  // Load frameworks (9c)
-  useEffect(() => {
-    const fetchFrameworks = async () => {
-      setFrameworksLoading(true);
-      try {
-        const response = await api.get("/frameworks");
-        setFrameworks(response.data.frameworks || []);
-      } catch (err) {
-        console.error("Failed to load frameworks:", err);
-      } finally {
-        setFrameworksLoading(false);
-      }
-    };
-
-    fetchFrameworks();
+    if (!location.state?.topic || !location.state?.mode) {
+      toast.error("No topic selected — pick one from Overview first", {
+        autoClose: 2500,
+        position: "top-center",
+      });
+      navigate("/overview", { replace: true });
+    }
   }, []);
 
-  // Load initial topic (9b)
+  // Get mic permission (bug fix #2: use streamRef for cleanup)
   useEffect(() => {
-    if (!mode) return;
-    fetchTopic();
-  }, [mode]);
+    let cancelled = false;
 
-  // Fetch topic with current filters (9b)
-  const fetchTopic = async () => {
-    if (!mode) return;
-
-    setTopicLoading(true);
-    setTopicFading(true);
-
-    try {
-      let url = `/topics/random?mode=${mode.slug}`;
-      if (difficulty !== "random") url += `&difficulty=${difficulty}`;
-      if (selectedTags.length > 0) url += `&tags=${selectedTags.join(",")}`;
-
-      const response = await api.get(url);
-      setTopic(response.data);
-
-      // Default framework from topic metadata if available
-      if (response.data.meta?.suggested_framework) {
-        setSelectedFramework(response.data.meta.suggested_framework);
-      }
-
-      // Fade in effect
-      setTimeout(() => setTopicFading(false), 50);
-    } catch (err) {
-      console.error("Failed to load topic:", err);
-      toast.error("Could not load topic", { autoClose: 2000, position: "top-center" });
-    } finally {
-      setTopicLoading(false);
-    }
-  };
-
-  // Request microphone access
-  useEffect(() => {
     const startMicrophone = async () => {
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+          video: false,
         });
+        if (cancelled) {
+          mediaStream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
+        // Show which input is in use, so a wrong device is obvious before recording.
+        const track = mediaStream.getAudioTracks()[0];
+        setMicLabel(track?.label || "unknown device");
+
+        streamRef.current = mediaStream;
         setStream(mediaStream);
       } catch (err) {
-        toast.error("❌ Microphone access denied!", { autoClose: 2000, position: "top-center" });
+        toast.error("❌ Microphone access denied!");
       }
     };
 
     startMicrophone();
 
     return () => {
-      stream?.getTracks().forEach((track) => track.stop());
+      cancelled = true;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, []);
 
-  // Timer countdown (normal modes) or count-up (read-aloud) (9d)
+  // Revoke the blob URL on unmount so navigating away doesn't leak it.
   useEffect(() => {
-    if (!recording) return;
-
-    const interval = setInterval(() => {
-      if (displayMode.slug === "read-aloud") {
-        // Count up for read-aloud mode
-        setElapsedSeconds((prev) => prev + 1);
-      } else {
-        // Countdown for other modes
-        setTimer((prev) => {
-          if (prev <= 1) {
-            stopRecording();
-            return prev;
-          }
-          return prev - 1;
-        });
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [recording, displayMode]);
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   // Start recording
   const startRecording = () => {
     recordedChunksRef.current = [];
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
 
     if (!stream) {
       toast.error("Microphone not available!");
       return;
-    }
-
-    // Reset elapsed time for read-aloud mode
-    if (displayMode.slug === "read-aloud") {
-      setElapsedSeconds(0);
     }
 
     const mediaRecorder = new MediaRecorder(stream);
@@ -184,35 +110,57 @@ export const Practice = () => {
       }
     };
 
+    // onstop fires once all buffered data has been flushed to
+    // recordedChunksRef, so this is the reliable point to build a preview --
+    // building it in the click handler that calls stop() would race the
+    // final dataavailable event.
+    mediaRecorder.onstop = () => {
+      if (recordedChunksRef.current.length === 0) return;
+      const blob = new Blob(recordedChunksRef.current, { type: "audio/webm" });
+      setPreviewUrl(URL.createObjectURL(blob));
+    };
+
     mediaRecorder.start();
     setRecording(true);
     setPaused(false);
+
+    timerRef.current?.start();
   };
 
   // Pause recording
   const pauseRecording = () => {
     mediaRecorderRef.current?.pause();
+    timerRef.current?.pause();
     setPaused(true);
   };
 
   // Resume recording
   const resumeRecording = () => {
     mediaRecorderRef.current?.resume();
+    timerRef.current?.resume();
     setPaused(false);
   };
 
-  // Stop recording
+  // Stop recording. Called both by the Stop button and by the timer's
+  // onComplete, so it must be safe to invoke more than once.
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+    }
+    timerRef.current?.pause();
     setRecording(false);
     setPaused(false);
   };
 
-  // Delete recording
+  // Delete recording / start over
   const deleteRecording = () => {
     recordedChunksRef.current = [];
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
     setRecording(false);
     setPaused(false);
+    timerRef.current?.reset();
     toast.success("Recording deleted!", {
       position: "top-center",
       autoClose: 2000,
@@ -228,361 +176,176 @@ export const Practice = () => {
 
     setSubmitting(true);
 
+    const blob = new Blob(recordedChunksRef.current, { type: "audio/webm" });
+    const formData = new FormData();
+    formData.append("mode_id", routerMode?.id || 1);
+    if (routerTopic?.id) formData.append("topic_id", routerTopic.id);
+    if (selectedFramework) formData.append("framework_slug", selectedFramework);
+    formData.append("video", blob, `recording-${Date.now()}.webm`);
+
     try {
-      const blob = new Blob(recordedChunksRef.current, { type: "audio/webm" });
-
-      const formData = new FormData();
-      formData.append("mode_id", mode?.id || 1);
-      if (topic?.id) formData.append("topic_id", topic.id);
-      if (selectedFramework) formData.append("framework_slug", selectedFramework);
-      formData.append("video", blob, `recording-${Date.now()}.webm`);
-
       const response = await api.post("/recordings", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { "Content-Type": "multipart/form-data" },
       });
-
-      if (!response.data || !response.data.id) {
-        throw new Error("Invalid response from server");
-      }
-
       setRecordingId(response.data.id);
-      toast.success("🎉 Recording submitted!", {
-        position: "top-center",
-        autoClose: 2000,
-      });
-
+      if (response.data.transcription_ok === false) {
+        toast.warn(
+          response.data.transcription_error ||
+            "No speech detected — check your microphone.",
+          { autoClose: 6000, position: "top-center" }
+        );
+      }
       setShowModal(true);
-    } catch (err) {
-      console.error("Submission failed:", err);
-      toast.error("Submission failed. Try again.", { autoClose: 2000, position: "top-center" });
+      recordedChunksRef.current = [];
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    } catch (error) {
+      toast.error("Failed to submit recording");
+      console.error("Submit error:", error);
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <p className="text-gray-600">Loading...</p>
-      </div>
-    );
+  if (!routerMode || !routerTopic) {
+    return null;
   }
 
-  const displayMode = mode || { name: "Practice", id: 1, default_timer_seconds: 60 };
-
-  // Read Aloud mode uses count-up, others use countdown
-  const isReadAloud = displayMode.slug === "read-aloud";
-  const displayTimer = isReadAloud ? elapsedSeconds : timer;
-  const timerSeconds = displayTimer % 60;
-  const timerMinutes = Math.floor(displayTimer / 60);
-  const isWarning = !isReadAloud && timer <= 10;
-
   return (
-    <>
-      <div className="flex flex-col h-screen max-h-screen overflow-hidden">
-        {/* Header */}
-        <div className="bg-[#FFEEE3] border border-[#FFEEE3]">
-          <h1 className="ml-8 font-semibold text-[#F25019] text-xl my-6">
-            {displayMode.name || "Practice"}
-          </h1>
-        </div>
+    <div className="min-h-screen bg-cream">
+      <ToastContainer />
 
-        {/* Main Content Area - Scrollable */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="flex flex-col items-center justify-start p-8 gap-8">
-            {/* Timer Display */}
-            <div className={`text-6xl font-bold font-mono transition-colors ${
-              isWarning ? "text-red-600" : "text-gray-800"
-            }`}>
-              {timerMinutes.toString().padStart(2, "0")}:
-              {timerSeconds.toString().padStart(2, "0")}
+      <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col px-5 py-8">
+        {/* Back link */}
+        <button
+          onClick={() => navigate("/overview")}
+          className="self-start rounded-xl px-2 py-1 text-sm font-semibold text-ink-soft transition-colors hover:text-primary focus-ring"
+        >
+          ← Back
+        </button>
+
+        {/* Main content: centered column */}
+        <div className="flex flex-1 flex-col items-center justify-center gap-9 py-6">
+          {/* Topic reminder */}
+          <div className="w-full text-center">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
+              Your topic
+            </p>
+            <p
+              className={`mx-auto mt-3 max-w-xl font-semibold text-ink ${
+                routerMode.slug === "read-aloud"
+                  ? "text-lg leading-relaxed md:text-xl"
+                  : "text-xl md:text-2xl"
+              }`}
+            >
+              {routerTopic.text || routerTopic.meta?.word}
+            </p>
+
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {selectedFramework && (
+                <span className="rounded-full bg-primary-soft px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-primary-700">
+                  {selectedFramework}
+                </span>
+              )}
+              {micLabel && (
+                <span className="max-w-[260px] truncate rounded-full border border-line bg-surface px-3 py-1 text-[11px] font-medium text-ink-muted">
+                  🎙 {micLabel}
+                </span>
+              )}
             </div>
-
-            {/* Recording Status */}
-            {recording && (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-red-600 rounded-full animate-pulse"></div>
-                <p className="text-gray-600 font-medium">
-                  {paused ? "Recording paused" : "Recording..."}
-                </p>
-              </div>
-            )}
-
-            {/* Microphone Indicator */}
-            {!recording && recordedChunksRef.current.length === 0 && (
-              <p className="text-gray-400 text-sm">
-                🎤 Ready to record. Click the record button to start.
-              </p>
-            )}
-
-            {/* Topic Card (9b) - Mode-Specific Rendering (9d) */}
-            {!recording && topic && (
-              <div className={`transition-opacity duration-400 w-full max-w-md ${
-                topicFading ? "opacity-0" : "opacity-100"
-              }`}>
-                {/* Learn Vocabulary Mode (9d) */}
-                {displayMode.slug === "learn-vocabulary" ? (
-                  <div className="bg-white border-2 border-gray-200 rounded-lg p-6 shadow-md">
-                    <p className="text-sm text-gray-500 uppercase tracking-wide mb-3">Vocabulary Word</p>
-                    <div className="mb-4">
-                      <p className="text-3xl font-bold text-[#F25019] mb-2">{topic.text}</p>
-                      {topic.meta?.part_of_speech && (
-                        <p className="text-sm text-gray-600 italic mb-2">
-                          <span className="font-semibold">{topic.meta.part_of_speech}</span>
-                        </p>
-                      )}
-                      {topic.meta?.definition && (
-                        <p className="text-sm text-gray-700 mb-2">
-                          <strong>Definition:</strong> {topic.meta.definition}
-                        </p>
-                      )}
-                      {topic.meta?.example_sentence && (
-                        <p className="text-sm text-gray-600 italic border-l-2 border-[#F25019] pl-3">
-                          "{topic.meta.example_sentence}"
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      onClick={fetchTopic}
-                      disabled={topicLoading}
-                      className="w-full px-4 py-2 bg-[#F25019] text-white rounded-lg hover:bg-[#CC3C0C] disabled:opacity-50 transition-colors font-medium text-sm"
-                    >
-                      {topicLoading ? "Loading..." : "Get Different Word"}
-                    </button>
-                  </div>
-                ) : displayMode.slug === "read-aloud" ? (
-                  /* Read Aloud Mode (9d) */
-                  <div className="bg-white border-2 border-gray-200 rounded-lg p-6 shadow-md">
-                    <p className="text-sm text-gray-500 uppercase tracking-wide mb-3">Passage</p>
-                    <div className="mb-4">
-                      <p className="text-lg leading-relaxed text-gray-800 mb-3">
-                        {topic.text}
-                      </p>
-                      {topic.meta?.target_seconds && (
-                        <p className="text-sm text-gray-600">
-                          Target time: <span className="font-semibold">{topic.meta.target_seconds}s</span>
-                          {topic.meta?.word_count && (
-                            <> ({topic.meta.word_count} words)</>
-                          )}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      onClick={fetchTopic}
-                      disabled={topicLoading}
-                      className="w-full px-4 py-2 bg-[#F25019] text-white rounded-lg hover:bg-[#CC3C0C] disabled:opacity-50 transition-colors font-medium text-sm"
-                    >
-                      {topicLoading ? "Loading..." : "Get Different Passage"}
-                    </button>
-                  </div>
-                ) : (
-                  /* Default Mode (9d) */
-                  <div className="bg-white border-2 border-gray-200 rounded-lg p-6 shadow-md">
-                    <p className="text-sm text-gray-500 uppercase tracking-wide mb-2">Today's Topic</p>
-                    <p className="text-xl font-semibold text-gray-800 mb-4">{topic.text}</p>
-
-                    {topic.difficulty && (
-                      <p className="text-xs text-gray-600 mb-3">
-                        Difficulty: <span className="font-semibold capitalize">{topic.difficulty}</span>
-                      </p>
-                    )}
-
-                    <button
-                      onClick={fetchTopic}
-                      disabled={topicLoading}
-                      className="w-full px-4 py-2 bg-[#F25019] text-white rounded-lg hover:bg-[#CC3C0C] disabled:opacity-50 transition-colors font-medium text-sm"
-                    >
-                      {topicLoading ? "Loading..." : "Get Different Topic"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Difficulty Filter (9b) */}
-            {!recording && (
-              <div className="w-full max-w-md">
-                <p className="text-sm text-gray-600 mb-2">Difficulty:</p>
-                <div className="flex gap-2 flex-wrap">
-                  {["easy", "medium", "hard", "random"].map((level) => (
-                    <button
-                      key={level}
-                      onClick={() => {
-                        setDifficulty(level);
-                        fetchTopic();
-                      }}
-                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                        difficulty === level
-                          ? "bg-[#F25019] text-white"
-                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                      }`}
-                    >
-                      {level.charAt(0).toUpperCase() + level.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Frameworks Accordion (9c) */}
-            {!recording && frameworks.length > 0 && (
-              <div className="w-full max-w-md">
-                <p className="text-sm text-gray-600 mb-3">Speaking Framework:</p>
-                <div className="space-y-2 border-t border-gray-200">
-                  {frameworks.map((fw) => (
-                    <Disclosure key={fw.slug}>
-                      {({ open }) => (
-                        <>
-                          <Disclosure.Button className="flex w-full justify-between items-center px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="radio"
-                                name="framework"
-                                checked={selectedFramework === fw.slug}
-                                onChange={() => setSelectedFramework(fw.slug)}
-                                className="w-4 h-4"
-                              />
-                              <span>{fw.name}</span>
-                            </div>
-                            <ChevronUpIcon
-                              className={`w-5 h-5 transition-transform ${
-                                open ? "transform rotate-180" : ""
-                              }`}
-                            />
-                          </Disclosure.Button>
-
-                          <Disclosure.Panel className="px-4 py-2 bg-gray-50 text-sm text-gray-600">
-                            <p className="mb-3 text-xs text-gray-500">{fw.best_for}</p>
-                            <ul className="space-y-2">
-                              {fw.steps.map((step) => (
-                                <li key={step.letter} className="text-xs">
-                                  <strong className="text-[#F25019]">{step.letter}.</strong> {step.label}: {step.description}
-                                </li>
-                              ))}
-                            </ul>
-                          </Disclosure.Panel>
-                        </>
-                      )}
-                    </Disclosure>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
 
-        {/* Privacy Disclaimer */}
-        <div className="px-8 py-4 bg-blue-50 border-t border-blue-200">
-          <p className="text-xs text-gray-600">
-            🔒 <strong>Privacy:</strong> Your audio is transcribed and analyzed, then deleted.
-            No recordings are stored on our servers.
-          </p>
-        </div>
+          {/* Circular Timer */}
+          <CircularTimer
+            ref={timerRef}
+            durationSeconds={routerMode?.default_timer_seconds || 60}
+            mode={routerMode?.slug === "read-aloud" ? "countup" : "countdown"}
+            onComplete={stopRecording}
+            accentColor={routerMode?.accent_color || "#DC9750"}
+          />
 
-        {/* Controls Footer */}
-        <div className="p-6 py-8">
-          {/* Control Row */}
-          <div className="w-full flex items-center justify-between">
-            {/* Left: Pause/Resume */}
-            <div className="flex justify-start w-1/3">
-              {recording && (
+          {/* Transport Controls */}
+          <div className="flex items-center justify-center gap-4">
+            {!recording ? (
+              <button
+                onClick={startRecording}
+                aria-label="Start recording"
+                className="flex h-20 w-20 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg shadow-primary/25 transition-all duration-200 hover:bg-primary-hover active:scale-95 focus-ring"
+              >
+                <span className="block h-6 w-6 rounded-full bg-white" />
+              </button>
+            ) : (
+              <>
                 <button
                   onClick={paused ? resumeRecording : pauseRecording}
-                  className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg border-4 border-white bg-white hover:shadow-xl transition-shadow"
-                  title={paused ? "Resume" : "Pause"}
+                  aria-label={paused ? "Resume recording" : "Pause recording"}
+                  className="flex h-14 w-14 items-center justify-center rounded-full border border-line bg-surface text-ink shadow-sm transition-all duration-200 hover:border-ink-muted active:scale-95 focus-ring"
                 >
                   {paused ? (
-                    // Resume ▶
-                    <div className="w-0 h-0 border-l-[20px] border-l-[#8F8D8D] border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent"></div>
+                    <span className="ml-0.5 block h-0 w-0 border-y-[9px] border-l-[14px] border-y-transparent border-l-ink" />
                   ) : (
-                    // Pause ⏸
-                    <div className="flex gap-1">
-                      <div className="w-2 h-6 bg-[#8F8D8D]"></div>
-                      <div className="w-2 h-6 bg-[#8F8D8D]"></div>
-                    </div>
+                    <span className="flex gap-1">
+                      <span className="block h-4 w-1.5 rounded-sm bg-ink" />
+                      <span className="block h-4 w-1.5 rounded-sm bg-ink" />
+                    </span>
                   )}
                 </button>
-              )}
-            </div>
-
-            {/* Center: Record/Stop */}
-            <div className="flex justify-center w-1/3">
-              <button
-                onClick={recording ? stopRecording : startRecording}
-                disabled={submitting}
-                className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg border-4 border-white bg-white hover:shadow-xl transition-shadow disabled:opacity-50"
-                title={recording ? "Stop" : "Start"}
-              >
-                {recording ? (
-                  // Stop ⏹
-                  <div className="w-10 h-10 bg-red-600 rounded"></div>
-                ) : (
-                  // Start 🔴
-                  <div className="w-12 h-12 bg-red-600 rounded-full"></div>
-                )}
-              </button>
-            </div>
-
-            {/* Right: Delete + Submit */}
-            <div className="flex justify-end w-1/3 gap-3">
-              {recordedChunksRef.current.length > 0 && (
-                <>
-                  <button
-                    onClick={deleteRecording}
-                    disabled={submitting}
-                    className="px-4 py-2 text-gray-500 hover:text-red-600 font-bold transition-colors disabled:opacity-50"
-                    title="Delete"
-                  >
-                    Delete
-                  </button>
-                  <button
-                    onClick={submitRecording}
-                    disabled={submitting}
-                    className="px-6 py-2 bg-[#F25019] text-white hover:bg-white hover:text-[#F25019] rounded-lg shadow font-bold transition-colors disabled:opacity-50"
-                  >
-                    {submitting ? "Transcribing..." : "Submit"}
-                  </button>
-                </>
-              )}
-            </div>
+                <button
+                  onClick={stopRecording}
+                  aria-label="Stop recording"
+                  className="flex h-20 w-20 items-center justify-center rounded-full bg-danger text-white shadow-lg shadow-danger/25 transition-all duration-200 hover:brightness-95 active:scale-95 focus-ring"
+                >
+                  <span className="block h-5 w-5 rounded-[3px] bg-white" />
+                </button>
+              </>
+            )}
           </div>
+
+          {recording && (
+            <p className="flex items-center gap-2 text-xs font-semibold text-danger">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-danger" />
+              {paused ? "Paused" : "Recording"}
+            </p>
+          )}
+
+          {/* Playback + Submit / Discard, once a recording exists and isn't
+              still in progress -- driven by previewUrl (state), not the
+              chunks ref, so this reliably re-renders when recording stops. */}
+          {previewUrl && !recording && (
+            <div className="flex w-full max-w-sm flex-col items-center gap-4">
+              <audio ref={audioRef} src={previewUrl} controls className="w-full" />
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Button onClick={submitRecording} disabled={submitting} size="lg">
+                  {submitting ? "Submitting…" : "Submit for review"}
+                </Button>
+                <Button onClick={deleteRecording} variant="danger" size="lg">
+                  Start over
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Success Modal */}
       {showModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full text-center">
-            <h2 className="text-xl font-semibold mb-4">🎉 Submission Successful</h2>
-            <p className="mb-6 text-gray-700">
-              Your recording has been transcribed and is being analyzed.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl bg-surface p-8 shadow-2xl animate-pop">
+            <h2 className="font-display text-xl font-normal tracking-tight text-ink">
+              Recording submitted
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+              We're analysing your delivery. Your feedback will be ready in a moment.
             </p>
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={() => {
-                  setShowModal(false);
-                  navigate("/overview");
-                }}
-                className="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 font-medium transition-colors"
-              >
-                Back to Overview
-              </button>
-              <button
-                onClick={() => {
-                  navigate("/feedback");
-                }}
-                className="px-4 py-2 bg-[#F25019] text-white rounded-lg hover:bg-[#CC3C0C] font-medium transition-colors"
-              >
-                View Feedback
-              </button>
+            <div className="mt-6 flex flex-col gap-2">
+              <Button onClick={() => navigate("/feedback")}>View feedback</Button>
+              <Button onClick={() => navigate("/overview")} variant="ghost">
+                Practice again
+              </Button>
             </div>
           </div>
         </div>
       )}
-
-      <ToastContainer />
-    </>
+    </div>
   );
 };

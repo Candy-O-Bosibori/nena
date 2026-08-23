@@ -1,6 +1,225 @@
+@import url('https://fonts.googleapis.com/css2?family=Gochi+Hand&family=Manrope:wght@400;500;600;700;800&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
 @import "tailwindcss";
-/* @import url('https://fonts.googleapis.com/css2?family=Manrope&display=swap'); */
+
+/* Tailwind v4 defaults `dark:` to prefers-color-scheme. We need a toggle a user
+   can override independently of the OS, so key it off a `.dark` class on <html>
+   instead — set by src/theme.js, which also seeds it before paint to avoid a
+   flash of the wrong theme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------------
+   Nena design tokens
+   Tailwind v4 reads @theme and generates utilities (bg-cream, text-ink, ...).
+
+   Palette: warm amber gold on deep navy, on a cool neutral surface. Two
+   accents share the work:
+     - primary   = amber gold #DC9750  (buttons, active tabs, links, focus ring)
+     - secondary = deep navy  #1E2640  (a second accent for things that need
+                   to read as distinct from a primary action/CTA; also doubles
+                   as the ink color, so text and secondary fills share a hue)
+   `danger` stays its own hue on purpose — see note below.
+
+   Contrast: amber-500 (#DC9750) is light-to-mid, so white text fails on it
+   (checked: 1.98:1) — use the deep navy ink instead, which clears 7.9:1.
+   Navy-500 (#1E2640) is dark, so white text on it clears 13.8:1 — the
+   opposite pairing from primary. So `text-on-primary` is navy ink,
+   `text-on-secondary` is white. Never swap these.
+
+   Type system: Manrope stays the workhorse sans for UI chrome (nav, buttons,
+   labels, body copy). Gochi Hand covers every display moment — headlines,
+   topic reveal, page titles, quotes — via font-display / font-serif (both
+   point at the same family; kept as two utilities so call sites can stay
+   semantic about *why* they're using the display face). Gochi Hand only
+   ships a single regular weight — font-bold/font-semibold on a font-display
+   element has no visual effect, so don't rely on weight for emphasis there.
+
+   Exception: the Read Aloud practice passage is a full paragraph the user
+   reads at length during a timed exercise, not a headline -- a handwritten
+   script hurts legibility there. That one spot uses font-serif-reading
+   (Source Serif 4, kept imported for this) instead of font-serif/font-display.
+
+   Dark mode: every color below is a var() pointing at a --*-light value.
+   .dark redefines those light values, so `bg-cream`, `text-ink`, `bg-surface`
+   etc. all repaint automatically — no `dark:` variant needed anywhere in JSX
+   except for the handful of spots doing something dark-specific (shadow
+   removal, image dimming). See the `.dark { }` block below for the actual
+   dark palette.
+--------------------------------------------------------------------------- */
+@theme {
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Gochi Hand', ui-serif, Georgia, serif;
+  --font-serif: 'Gochi Hand', ui-serif, Georgia, serif;
+  --font-serif-reading: 'Source Serif 4', ui-serif, Georgia, serif;
+
+  /* Primary — amber gold. */
+  --color-primary-50:  #FCF3E8;
+  --color-primary-100: #F8E4C9;
+  --color-primary-200: #F0CC9C;
+  --color-primary-300: #E8B476;
+  --color-primary-400: #E2A461;
+  --color-primary-500: #DC9750;
+  --color-primary-600: #BD7E3E;
+  --color-primary-700: #966333;
+  --color-primary-800: #734B27;
+  --color-primary-900: #52371D;
+
+  --color-primary: var(--color-primary-500);
+  --color-primary-hover: var(--color-primary-600);
+  --color-primary-soft: var(--color-primary-soft-light);
+
+  /* Secondary — deep navy. A real second hue (not a tint of primary),
+     reserved for things that need to read as distinct from a primary CTA. */
+  --color-secondary-50:  #EAEBF0;
+  --color-secondary-100: #C9CCDA;
+  --color-secondary-200: #9CA2BC;
+  --color-secondary-300: #6A7295;
+  --color-secondary-400: #3F4970;
+  --color-secondary-500: #1E2640;
+  --color-secondary-600: #191F35;
+  --color-secondary-700: #141929;
+  --color-secondary-800: #0F131F;
+  --color-secondary-900: #0A0D15;
+
+  --color-secondary: var(--color-secondary-500);
+  --color-secondary-hover: var(--color-secondary-600);
+  --color-secondary-soft: var(--color-secondary-soft-light);
+
+  /* Text-on-fill: see the contrast note above. */
+  --color-on-primary: #1E2640;
+  --color-on-secondary: #FFFFFF;
+
+  /* Surfaces, text, and line all resolve through a *-light custom property so
+     the .dark block can override just that property and have every utility
+     that references it repaint. */
+  --color-cream: var(--color-cream-light);
+  --color-surface: var(--color-surface-light);
+  --color-line: var(--color-line-light);
+
+  --color-ink: var(--color-ink-light);
+  --color-ink-soft: var(--color-ink-soft-light);
+  --color-ink-muted: var(--color-ink-muted-light);
+
+  /* Danger is the one deliberate non-brand hue — see note above. */
+  --color-danger: var(--color-danger-light);
+
+  /* Motion */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root {
+  --color-primary-soft-light: #FCF3E8;
+  --color-secondary-soft-light: #C9CCDA;
+  --color-cream-light: #F0F0F3;
+  --color-surface-light: #FFFFFF;
+  --color-line-light: #D6D8E2;
+  /* ink derives from the navy secondary (#1E2640), so text and the secondary
+     accent share the same hue instead of switching to gray. */
+  --color-ink-light: #1E2640;
+  --color-ink-soft-light: #3F4970;
+  --color-ink-muted-light: #7A8099;
+  --color-danger-light: #B3261E;
+}
+
+.dark {
+  --color-primary-soft-light: #3A2D19;
+  --color-secondary-soft-light: #232C4A;
+  --color-cream-light: #10131F;
+  --color-surface-light: #171B2C;
+  --color-line-light: #2B3150;
+  --color-ink-light: #E8E9EF;
+  --color-ink-soft-light: #C2C5D6;
+  --color-ink-muted-light: #8A8FAA;
+  --color-danger-light: #F2867E;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
 
 body {
-  font-family: 'Manrope', sans-serif;
+  font-family: var(--font-sans);
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 200ms var(--ease-out-soft), color 200ms var(--ease-out-soft);
+}
+
+/* Tabular numerals so countdown digits don't jitter as they change */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Animations ---------------------------------------------------------- */
+@keyframes nena-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes nena-pop {
+  0%   { transform: scale(0.96); opacity: 0.6; }
+  60%  { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Candle-timer flame. Keeps the -50% X translate in every keyframe so the
+   flame stays centred on the wick while it flickers. */
+@keyframes nena-flicker {
+  0%, 100% { transform: translateX(-50%) scale(1) rotate(-2deg); }
+  25%      { transform: translateX(-50%) scale(1.05, 0.95) rotate(2deg); }
+  50%      { transform: translateX(-50%) scale(0.95, 1.05) rotate(-1deg); }
+  75%      { transform: translateX(-50%) scale(1.02, 0.98) rotate(1deg); }
+}
+
+.animate-fade-up {
+  animation: nena-fade-up 420ms var(--ease-out-soft) both;
+}
+
+.animate-pop {
+  animation: nena-pop 320ms var(--ease-out-soft) both;
+}
+
+.candle-flame {
+  animation: nena-flicker 1.6s ease-in-out infinite;
+}
+
+/* Focus ring — consistent and visible for keyboard users.
+   Uses primary-700, not --color-primary: magenta-500 against the pale-pink
+   surface is only ~2.5:1 contrast (checked), invisible as a UI outline (WCAG
+   wants 3:1+). The 700 shade is still magenta-family (4.4:1) but visible. */
+.focus-ring:focus-visible {
+  outline: 2px solid var(--color-primary-700);
+  outline-offset: 2px;
+}
+
+/* Thin, unobtrusive scrollbars on scrollable panes */
+.scroll-slim::-webkit-scrollbar { height: 6px; width: 6px; }
+.scroll-slim::-webkit-scrollbar-track { background: transparent; }
+.scroll-slim::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 999px;
+}
+
+/* Hide scrollbar but keep scrolling (mode tab strip on mobile) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

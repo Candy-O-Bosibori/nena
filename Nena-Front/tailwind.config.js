@@ -9,16 +9,10 @@ export default {
       boxShadow: {
         'md': '0 0 10px rgba(0, 0, 0, 0.1)',
       },
-      colors: {
-        'primary':'#F25019',
-        'secondary':'#FFEEE3',
-        'read':'#BBC53B',
-        'read':'#FFC107',
-        'read':'#F25019'// 39%
-      },
-      fontFamily:{
-        'body':"Open Sans"
-      }
+      // Color and font tokens now live in src/index.css via @theme (Tailwind v4).
+      // Nena is single-hue: #DC9750 (--color-primary-500) plus its tints/shades,
+      // with --color-danger as the one deliberate exception for destructive/
+      // warning states.
     },
   },
   plugins: [],

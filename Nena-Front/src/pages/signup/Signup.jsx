@@ -39,7 +39,7 @@ export const Signup = () => {
             }
 
             const data = await response.json();
-            localStorage.setItem('token', data.access_token);
+            localStorage.setItem('access_token', data.access_token);
             if (data.refresh_token) {
                 localStorage.setItem('refreshToken', data.refresh_token);
             }
@@ -49,7 +49,7 @@ export const Signup = () => {
     });
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('access_token');
         if (token) {
             try {
                 const decodedToken = jwtDecode(token);
@@ -90,146 +90,126 @@ export const Signup = () => {
             
             if (data.access_token) {
                 // Saves the access token into the browser’s localStorage so the user stays logged in.
-                localStorage.setItem('token', data.access_token);
+                localStorage.setItem("access_token", data.access_token);
                 // used to get new access token later
-                localStorage.setItem('refreshToken', data.refresh_token);
-                
-                navigate('/overview')
-                
+                localStorage.setItem("refreshToken", data.refresh_token);
+
+                navigate("/overview");
+
             } else {
-                setErrorMessage('Access token is missing in the response');
+                setErrorMessage("Access token is missing in the response");
             }
         } catch (error) {
-            console.error('Error:', error);
-            setErrorMessage('Something went wrong. Please try again.');
+            console.error("Error:", error);
+            setErrorMessage("Something went wrong. Please try again.");
         }
         setIsLoading(false); 
     };
 
     return (
-       <div className="min-h-screen flex items-center justify-center bg-[#FFD1B0] px-4">
-      <div className="w-full max-w-5xl bg-[#FEDCC5] rounded-3xl shadow-lg grid grid-cols-1 md:grid-cols-2 overflow-hidden">
-        
-        {/* Left side - Login form */}
-        <div className="  bg:mx-20  bg:my-10 md:mx-10 md:my-10 rounded-2xl flex flex-col justify-center p-10 bg-opacity-50 bg-[rgba(255,242,233,0.5)] shadow-md">
-          {/* Logo */}
-          <img className='self-center mb-2 w-24 md:w-16' src={logo} alt="Logo" />
-          <h2 className="self-center text-2xl mb-4">Sign Up</h2>
+      <div className="flex min-h-screen items-center justify-center bg-cream px-5 py-10">
+        <div className="grid w-full max-w-4xl overflow-hidden rounded-3xl border border-line bg-surface shadow-xl md:grid-cols-2">
+          {/* Left side - Signup form */}
+          <div className="flex flex-col justify-center p-8 md:p-12">
+            <img className="mb-8 h-9 w-auto self-start object-contain" src={logo} alt="Nena" />
 
-        
+            <h1 className="font-display text-3xl font-normal tracking-tight text-ink">Create your account</h1>
+            <p className="mt-2 text-sm text-ink-soft">
+              Start practising and get feedback on every session.
+            </p>
+
             {errorMessage && (
-                    <div className="text-red-600 text-[10px] mt-2 text-center">{errorMessage}</div>
+              <div className="mt-5 rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm font-medium text-danger">
+                {errorMessage}
+              </div>
+            )}
+
+            <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-ink">Name</label>
+                <input
+                  className="w-full rounded-xl border border-line bg-cream px-4 py-3 text-sm text-ink transition-colors placeholder:text-ink-muted focus:border-primary focus:bg-surface focus:outline-none"
+                  type="text"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-ink">Email</label>
+                <input
+                  className="w-full rounded-xl border border-line bg-cream px-4 py-3 text-sm text-ink transition-colors placeholder:text-ink-muted focus:border-primary focus:bg-surface focus:outline-none"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-ink">Password</label>
+                <div className="relative">
+                  <input
+                    className="w-full rounded-xl border border-line bg-cream px-4 py-3 pr-11 text-sm text-ink transition-colors placeholder:text-ink-muted focus:border-primary focus:bg-surface focus:outline-none"
+                    type={passwordVisible ? "text" : "password"}
+                    placeholder="At least 8 characters"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={togglePasswordVisibility}
+                    aria-label={passwordVisible ? "Hide password" : "Show password"}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-ink-muted transition-colors hover:text-ink"
+                  >
+                    {passwordVisible ? <PiEyeLight size={18} /> : <PiEyeSlash size={18} />}
+                  </button>
+                </div>
+                <p className="mt-1.5 text-xs text-ink-muted">
+                  Use 8+ characters with upper &amp; lowercase, a number and a symbol.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-on-primary shadow-sm transition-all duration-200 hover:bg-primary-hover active:scale-[0.99] disabled:opacity-50 focus-ring"
+              >
+                {isLoading && (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                 )}
-                 {isLoading && (
-                    <div className="flex justify-center mt-2">
-                            <div className="w-4 h-4 border-2 border-orange-500 border-dashed rounded-full animate-spin"></div>
-                        </div>
-                    // <div className="text-secondary text-xs text-[10px] mt-2 text-center">"Signing in... "</div>
-                )}
+                {isLoading ? "Creating account…" : "Create account"}
+              </button>
+            </form>
 
-
-          {/* Form */}
-          <form className="space-y-2" onSubmit={handleSubmit}>
-            <div>
-              <label className="block text-[10px] mb-1">Name</label>
-               <input
-                        className="w-full p-2 text-[10px] bg-white rounded-md focus:outline-none focus:ring-2 focus:ring-orange-400"
-                        type="name"
-                        placeholder="Name"
-                        value={name}
-                        onChange={e => setName(e.target.value)}
-                    />
+            <div className="my-6 flex items-center gap-3">
+              <div className="h-px flex-1 bg-line" />
+              <span className="text-xs font-medium text-ink-muted">or continue with</span>
+              <div className="h-px flex-1 bg-line" />
             </div>
-            <div>
-              <label className="block text-[10px] mb-1">Email</label>
-               <input
-                        className="w-full p-2 text-[10px] bg-white rounded-md focus:outline-none focus:ring-2 focus:ring-orange-400"
-                        type="email"
-                        placeholder="Email"
-                        value={email}
-                        onChange={e => setEmail(e.target.value)}
-                    />
-            </div>
-              <label className="block text-[10px] mb-2">Password</label>
 
-            <div className='relative   rounded-[8px]'>
-              <input
-                        className="w-full p-2  text-[10px] bg-white rounded-md  focus:outline-none focus:ring-2 focus:ring-orange-400"
-                            type={passwordVisible ? "text" : "password"}
-                            placeholder="Password"
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                        />
-                        <div className='absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5'>
-                            {passwordVisible ? (
-                                <PiEyeLight className='fill-Heading' onClick={togglePasswordVisibility} />
-                            ) : (
-                                <PiEyeSlash className='fill-Heading' onClick={togglePasswordVisibility} />
-                            )}
-                        </div>
-                    </div>
-                    <div className='flex items-center justify-between'>
-                        <div className='flex  items-center space-x-2 font-body text-[10px] font-normal text-Heading'>
-                            <input type='checkbox' />
-                            <label>Remember me</label>
-                        </div>
-                        <p className="text-right mt-2 text-[10px] text-orange-500 cursor-pointer hover:underline">
-                            Forgot Password?
-                        </p>
-                    </div>
-
-            <button
-              type="submit"
-              className="w-full bg-[#F25019] text-[10px] text-semibold text-white py-2 rounded-xl hover:bg-orange-600 transition"
-            >
-              Create Account
+            <button className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-surface py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-ring">
+              <img src={google} alt="" className="h-5 w-5" />
+              Google
             </button>
-          </form>
 
-          {/* Divider */}
-          <div className="my-3 flex items-center">
-            <div className="flex-1 border-t border-gray-300"></div>
-            <span className="px-3 text-[10px] text-gray-500">Or Continue With</span>
-            <div className="flex-1 border-t border-gray-300"></div>
+            <p className="mt-8 text-center text-sm text-ink-soft">
+              Already have an account?{" "}
+              <button
+                type="button"
+                className="font-bold text-primary hover:underline"
+                onClick={() => navigate('/signin')}
+              >
+                Sign in
+              </button>
+            </p>
           </div>
 
-           {/* Social login */}
-          <div className="flex justify-center gap-4">
-            <button className=" p-2 w-full flex items-center justify-center rounded-full bg-white hover:bg-gray-100">
-              <img src={google} alt="Google" className="w-6 h-6 " />
-            </button>
-            {/* <button className="p-3 rounded-full  bg-white hover:bg-gray-100">
-              <img src={github} alt="GitHub" className="w-6 h-6" />
-            </button>
-            <button className="p-3 rounded-full bg-white  hover:bg-gray-100">
-              <img src={facebook} alt="Facebook" className="w-6 h-6" />
-            </button> */}
-          </div> 
-          <p className="mt-6 text-center text-[10px]">
-            Aready have an account?{" "}
-            <span className="text-orange-600 font-medium cursor-pointer hover:underline" onClick={()=> navigate('/signin')} >
-              Login
-            </span>
-          </p>
-
-          {/* Register link */}
-        
-        </div>
-
-        {/* Right side - Illustration (hidden on small screens) */}
-        <div className="hidden md:flex items-center justify-center bg-[FEDCC5]">
-          <img
-            src={image}
-            alt="Illustration"
-            className="max-w-sm"
-          />
+          <div className="hidden items-center justify-center bg-cream p-12 md:flex">
+            <img src={image} alt="" className="max-w-xs" />
+          </div>
         </div>
       </div>
-    </div> 
     );
 }
-
-
-
-
-

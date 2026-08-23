@@ -1,348 +1,448 @@
-import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom';
-import { jwtDecode } from "jwt-decode";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Disclosure, Listbox } from "@headlessui/react";
+import { ChevronUpIcon, ChevronUpDownIcon, CheckIcon } from "@heroicons/react/20/solid";
+import SpinReveal from "../../Components/SpinReveal/SpinReveal";
+import Button from "../../Components/ui/Button";
+
+const PLACEHOLDER_TOPICS = [
+  "Spinning the wheel…",
+  "Picking a prompt…",
+  "Something worth saying…",
+  "Warming up…",
+  "Almost there…",
+];
+
+const DIFFICULTIES = ["random", "easy", "medium", "hard"];
+
+const MODE_HEADLINE = {
+  "random-topic": "Wildcard",
+  "interview-prep": "Interview Ready",
+  "learn-vocab": "Word Boost",
+  "read-aloud": "Practice Reading Aloud",
+  "daily-reflection": "Today's Reflection",
+};
+
+// No fill, just colored text: pastel traffic-light hues, one deliberate
+// exception to the brand's amber/navy-only palette so difficulty reads at a
+// glance. Shades chosen to clear 4.5:1 on both the light cream and dark
+// near-black page backgrounds (checked: green #4CA96A / #7ED9A0, yellow
+// #B08900 / #E8D06A, red #E05F5F / #FF9B9B).
+const DIFFICULTY_TONE = {
+  easy: "text-[#4CA96A] dark:text-[#7ED9A0]",
+  medium: "text-[#B08900] dark:text-[#E8D06A]",
+  hard: "text-[#E05F5F] dark:text-[#FF9B9B]",
+};
 
 export const Overview = () => {
+  const navigate = useNavigate();
+
+  // Core data state
   const [modes, setMode] = useState([]);
-  const [activity_log, setActivity_log] = useState([]);
   const [loading, setLoading] = useState(true);
   const [nextPractice, setNextPractice] = useState(null);
-  const [nextPracticeLoading, setNextPracticeLoading] = useState(false);
-  const [trends, setTrends] = useState(null);
-  const [trendsLoading, setTrendsLoading] = useState(false);
-  const [recordings, setRecordings] = useState([]);
-  const navigate = useNavigate();
-  const [user, setUser] = useState({});
 
+  // Spin/filter state
+  const [activeModeSlug, setActiveModeSlug] = useState(null);
+  const [difficulty, setDifficulty] = useState("random");
+  const [spinNonce, setSpinNonce] = useState(0);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [frameworks, setFrameworks] = useState([]);
+  const [selectedFramework, setSelectedFramework] = useState(null);
+
+  // Initialize active mode once modes load
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const refreshToken = localStorage.getItem('refreshToken');
-
-    // Only fetch if user is authenticated
-    if (!token || !refreshToken) {
-      setLoading(false);
-      return;
+    if (modes.length > 0 && !activeModeSlug) {
+      setActiveModeSlug(nextPractice?.mode?.slug || modes[0]?.slug);
     }
+  }, [modes, activeModeSlug, nextPractice?.mode?.slug]);
 
-    let userId;
-    try {
-      const decodedToken = jwtDecode(token);
-      userId = decodedToken.sub;
-    } catch (error) {
+  const activeMode = modes.find((m) => m.slug === activeModeSlug);
+  const accent = activeMode?.accent_color || "#DC9750";
+
+  // Main data fetch
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    const refreshToken = localStorage.getItem("refreshToken");
+
+    if (!token || !refreshToken) {
       setLoading(false);
       return;
     }
 
     const fetchData = async () => {
       try {
-        // fetch modes
-        const response1 = await fetch("http://127.0.0.1:5000/modes", {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-        const data1 = await response1.json();
-        setMode(data1);
+        const [modesRes, nextPracticeRes, frameworksRes] = await Promise.all([
+          api.get("/modes"),
+          api.get("/next-practice").catch(() => ({ data: null })),
+          api.get("/frameworks").catch(() => ({ data: { frameworks: [] } })),
+        ]);
 
-        // Activity log
-        const response2 = await fetch("http://127.0.0.1:5000/activity_logs", {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-
-        const data2 = await response2.json();
-
-        const response3 = await fetch(`http://127.0.0.1:5000/userById/${userId}`, {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-
-        const data3 = await response3.json();
-        setActivity_log(data2);
-        setUser(data3);
-
+        setMode(modesRes.data);
+        setNextPractice(nextPracticeRes.data);
+        setFrameworks(frameworksRes.data.frameworks || []);
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error("Error fetching overview data:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    // Fetch next practice (9h - continue block)
-    const fetchNextPractice = async () => {
-      setNextPracticeLoading(true);
-      try {
-        const response = await api.get('/next-practice');
-        setNextPractice(response.data);
-      } catch (err) {
-        // Silently fail if not authenticated
-        setNextPractice(null);
-      } finally {
-        setNextPracticeLoading(false);
-      }
-    };
-
-    // Fetch trends (9j - sparklines)
-    const fetchTrends = async () => {
-      setTrendsLoading(true);
-      try {
-        const response = await api.get('/trends');
-        setTrends(response.data);
-      } catch (err) {
-        // Silently fail if not authenticated
-        setTrends(null);
-      } finally {
-        setTrendsLoading(false);
-      }
-    };
-
-    // Fetch recordings for count check (9j - gating)
-    const fetchRecordings = async () => {
-      try {
-        const response = await fetch('http://127.0.0.1:5000/recordings', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await response.json();
-        setRecordings(data);
-      } catch (err) {
-        // Silently fail if not authenticated
-        setRecordings([]);
-      }
-    };
-
     fetchData();
-    fetchNextPractice();
-    fetchTrends();
-    fetchRecordings();
   }, []);
 
-    return (
-    <div className=" px-4 lg:px-[50px] px-4 lg:py-[20px]min-h-screen bg-white py-10 flex flex-col md:flex-row gap-6">
-      {/* LEFT SIDE - CARDS */}
-      <div className="md:w-3/5 flex flex-col gap-6 mr-4"      
-      >
-        <h1 className="text-lg md:text-xl  text-[#F25019] -mb-6">
-          Hello <span className="text-[#F25019] font-bold">{user.name}</span>. Welcome !!
-        </h1>
+  // Spin reveal: resolve function that fetches the topic
+  const resolveTopic = async () => {
+    if (!activeMode) throw new Error("No active mode");
 
-        {/* Continue Block (9h) */}
-        {nextPractice && (
-          <div
-            className="rounded-2xl text-white p-5 md:p-6 shadow-lg w-full min-h-[120px] flex flex-col justify-center cursor-pointer transition-transform hover:scale-105"
-            style={{
-              backgroundColor: nextPractice.mode?.accent_color || "#F25019",
-              boxShadow: `0 10px 25px ${nextPractice.mode?.accent_color || "#F25019"}40`
-            }}
-            onClick={() => navigate(`/practice/${nextPractice.mode?.slug}`)}
+    const isShingled = activeModeSlug === "daily-reflection";
+    const url = isShingled
+      ? "/topics/today?mode=daily-reflection"
+      : `/topics/random?mode=${activeModeSlug}${
+          difficulty !== "random" ? `&difficulty=${difficulty}` : ""
+        }`;
+
+    const response = await api.get(url);
+    return response.data;
+  };
+
+  const handleTopicSettled = (topic) => {
+    setSelectedTopic(topic);
+    if (topic?.meta?.suggested_framework) {
+      setSelectedFramework(topic.meta.suggested_framework);
+    }
+  };
+
+  const handleTopicError = (err) => {
+    console.error("Failed to load topic:", err);
+  };
+
+  const goToPractice = (topic, mode, framework) => {
+    navigate(`/practice/${mode?.slug}`, {
+      state: { topic, mode, selectedFramework: framework ?? null },
+    });
+  };
+
+  // Render topic card based on mode type
+  const renderTopicCard = (topic, isSettled) => {
+    if (!topic) return null;
+
+    const isLearnVocab = activeModeSlug === "learn-vocabulary";
+    const isReadAloud = activeModeSlug === "read-aloud";
+    const reveal = isSettled ? "animate-fade-up" : "opacity-0";
+
+    if (isLearnVocab) {
+      return (
+        <div className={`text-center ${reveal}`}>
+          <p className="font-display text-3xl font-normal tracking-tight text-ink md:text-4xl">
+            {topic.text}
+          </p>
+          {topic.meta?.part_of_speech && (
+            <p className="mt-2 text-xs uppercase tracking-[0.18em] text-ink-muted">
+              {topic.meta.part_of_speech}
+            </p>
+          )}
+          {topic.meta?.definition && (
+            <p className="mt-4 text-base leading-relaxed text-ink-soft">
+              {topic.meta.definition}
+            </p>
+          )}
+          {topic.meta?.example_sentence && (
+            <p className="mt-3 text-sm italic text-ink-muted">
+              “{topic.meta.example_sentence}”
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    if (isReadAloud) {
+      return (
+        <div className={`text-center ${reveal}`}>
+          <p className="font-serif-reading text-xl leading-relaxed text-ink md:text-2xl">
+            {topic.text}
+          </p>
+          <p className="mt-4 text-xs uppercase tracking-[0.18em] text-ink-muted">
+            Target {topic.meta?.target_seconds || 60}s · {topic.meta?.word_count || 0} words
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className={`text-center ${reveal}`}>
+        <p className="font-display text-2xl font-normal leading-snug tracking-tight text-ink md:text-[2.1rem]">
+          {topic.text}
+        </p>
+        {topic.difficulty && (
+          <span
+            className={`mt-5 inline-block text-[11px] font-bold uppercase tracking-[0.14em] ${
+              DIFFICULTY_TONE[topic.difficulty] || "text-ink-soft"
+            }`}
           >
-            <p className="text-xs opacity-90 mb-1">👉 Continue where you left off</p>
-            <h3 className="font-semibold text-base md:text-lg mb-2">{nextPractice.topic?.text}</h3>
-            <p className="text-sm opacity-90">{nextPractice.reason}</p>
+            {topic.difficulty}
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const isDaily = activeModeSlug === "daily-reflection";
+  const isSpinDisabledForDaily = isDaily && selectedTopic !== null;
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-cream">
+        <div className="flex flex-col items-center gap-4">
+          <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-line border-t-primary" />
+          <p className="text-sm text-ink-muted">Loading your practice…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-cream">
+      <div className="mx-auto flex w-full max-w-3xl  flex-col items-center px-5 pb-24 pt-8 md:pt-12">
+        {/* ---------- Continue where you left off ---------- */}
+        {nextPractice?.topic && (
+          <button
+            onClick={() =>
+              goToPractice(
+                nextPractice.topic,
+                nextPractice.mode,
+                nextPractice.topic?.meta?.suggested_framework
+              )
+            }
+            className="mt-8 w-full mb-10 rounded-2xl border border-line bg-surface p-4 text-left transition-all duration-200 hover:border-primary/40 hover:shadow-sm focus-ring"
+          >
+            <p className="text-[15px] font-bold uppercase tracking-[0.16em] text-primary-700">
+              Pick up where you left off
+            </p>
+            <p className="mt-1.5 line-clamp-2 text-sm font-semibold text-ink">
+              {nextPractice.topic.text}
+            </p>
+            {nextPractice.reason && (
+              <p className="mt-1 text-xs text-ink-muted">{nextPractice.reason}</p>
+            )}
+          </button>
+        )}
+        
+        {/* ---------- Mode tabs ---------- */}
+        <nav className="w-full">
+          <div className="no-scrollbar flex gap-2 overflow-x-auto rounded-lg border border-line bg-surface/70 p-1.5 backdrop-blur">
+            {modes.map((mode) => {
+              const active = mode.slug === activeModeSlug;
+              return (
+                <button
+                  key={mode.slug}
+                  onClick={() => {
+                    setActiveModeSlug(mode.slug);
+                    setSelectedTopic(null);
+                    setSelectedFramework(null);
+                  }}
+                  style={active ? { backgroundColor: mode.accent_color } : undefined}
+                  className={[
+                    "flex-1 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold",
+                    "transition-all duration-200 focus-ring",
+                    active
+                      // Forest ink, not white: mode accent_color values sit on
+                      // the gold/orange scales, which stay light even at their
+                      // darkest shades -- white text fails contrast there.
+                      ? "text-ink shadow-sm"
+                      : "text-ink-soft hover:bg-primary-soft/60 hover:text-ink",
+                  ].join(" ")}
+                >
+                  {mode.name}
+                </button>
+              );
+            })}
           </div>
+        </nav>
+
+        {/* ---------- Mode explainer ---------- */}
+        <header className="mt-10 text-center md:mt-14">
+          <h1 className="font-display text-4xl font-normal tracking-tight text-ink md:text-5xl">
+            {MODE_HEADLINE[activeModeSlug] || activeMode?.name || "Practice"}
+          </h1>
+          <p className="mt-3 text-base text-ink-soft">
+            {activeMode?.explainer || activeMode?.description || "Pick a prompt and start speaking."}
+          </p>
+        </header>
+
+        {/* ---------- Steps ---------- */}
+        <ol className="mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm font-semibold text-ink-soft">
+          {!isDaily && (
+            <li className="flex items-center gap-2">
+              <span>
+                <span className="text-primary-700">1)</span> Pick a difficulty
+              </span>
+              <Listbox
+                value={difficulty}
+                onChange={(level) => {
+                  setDifficulty(level);
+                  setSelectedTopic(null);
+                }}
+              >
+                <div className="relative">
+                  <Listbox.Button className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-semibold capitalize text-ink transition-colors hover:border-ink-muted focus-ring">
+                    <span>{difficulty}</span>
+                    <ChevronUpDownIcon className="h-4 w-4 shrink-0 text-ink-muted" />
+                  </Listbox.Button>
+                  <Listbox.Options className="absolute z-10 mt-1 w-36 overflow-hidden rounded-lg border border-line bg-surface shadow-lg focus:outline-none">
+                    {DIFFICULTIES.map((level) => (
+                      <Listbox.Option
+                        key={level}
+                        value={level}
+                        className="flex cursor-pointer items-center justify-between gap-2 px-4 py-2.5 text-sm font-semibold capitalize text-ink data-[focus]:bg-cream"
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span>{level}</span>
+                            {selected && <CheckIcon className="h-4 w-4 shrink-0 text-ink-muted" />}
+                          </>
+                        )}
+                      </Listbox.Option>
+                    ))}
+                  </Listbox.Options>
+                </div>
+              </Listbox>
+            </li>
+          )}
+          {["Get a topic", "Set your timer", "Record & speak"].map((step, i) => (
+            <li key={step} className="flex items-center gap-3">
+              {(i > 0 || !isDaily) && <span className="text-line">·</span>}
+              <span>
+                <span className="text-primary-700">{isDaily ? i + 1 : i + 2})</span> {step}
+              </span>
+            </li>
+          ))}
+        </ol>
+
+        {/* ---------- Spin reveal stage ---------- */}
+        <section className="mt-8 w-full">
+          <SpinReveal
+            candidates={PLACEHOLDER_TOPICS}
+            resolve={resolveTopic}
+            spinKey={activeModeSlug ? `${activeModeSlug}-${difficulty}-${spinNonce}` : ""}
+            onSettle={handleTopicSettled}
+            onError={handleTopicError}
+            renderResult={renderTopicCard}
+            accent={accent}
+          />
+        </section>
+
+        {/* ---------- Primary actions ---------- */}
+        <div className="mt-8 flex w-full flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <Button
+            size="lg"
+            onClick={() => setSpinNonce((n) => n + 1)}
+            disabled={isSpinDisabledForDaily}
+            className="w-full sm:w-auto sm:min-w-[168px]"
+            style={{ backgroundColor: accent }}
+          >
+            Generate!
+          </Button>
+          <Button
+            size="lg"
+            variant="secondary"
+            onClick={() => goToPractice(selectedTopic, activeMode, selectedFramework)}
+            disabled={!selectedTopic}
+            className="w-full sm:w-auto sm:min-w-[168px]"
+          >
+            Timer →
+          </Button>
+        </div>
+
+        {isDaily && selectedTopic && (
+          <p className="mt-4 text-center text-xs text-ink-muted">
+            Today’s reflection is fixed — come back tomorrow for a new one.
+          </p>
         )}
 
-        <h2 className="text-sm md:text-2xl -mb-2 ">Select A Mode</h2>
-
-        {/* Dynamic Mode Cards (9h) */}
-        {modes.map((mode) => (
-          <div
-            key={mode.id}
-            className="rounded-2xl text-white p-5 md:p-6 shadow-lg w-full min-h-[150px] flex flex-col justify-center cursor-pointer transition-transform hover:scale-105"
-            style={{
-              backgroundColor: mode.accent_color || "#F25019",
-              boxShadow: `0 10px 25px ${mode.accent_color || "#F25019"}40`
-            }}
-            onClick={() => navigate(`/practice/${mode.slug}`)}
-          >
-            <h3 className="font-semibold text-base md:text-lg md:-mt-8">{mode.name}</h3>
-            <p className="text-sm mt-2">{mode.description}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* RIGHT SIDE - STATISTICS + ACTIVITY */}
-      <div className="md:w-2/5 flex flex-col gap-6">
-        {/* Statistics */}
-        <div className=" flex flex-col justify-center">
-          <h2 className="text-lg md:text-2xl mb-4">Statistics</h2>
-          <div className="grid grid-cols-2 gap-4">
-            {/* Stat Box */}
-            <div className="bg-[#FFEEE3]  md:min-h-40 rounded-xl p-4 flex flex-col items-center justify-center shadow-sm">
-              <span className="text-sm">{modes[0]?.name}</span>
-              <span className="text-2xl font-bold text-red-500 mt-2">{modes[0]?.recordings.length}</span>
+        {/* ---------- Frameworks ---------- */}
+        {selectedTopic && frameworks.length > 0 && (
+          <section className="mt-12 w-full">
+            <h2 className="mb-1 text-center text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
+              Optional structure
+            </h2>
+            <p className="mb-3 text-center text-xs text-ink-muted">
+              A framework is a simple shape for your answer, made of a few short beats to hit in order. Pick one if you want a bit of scaffolding, or skip it and speak freely.
+            </p>
+            <div className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+              {frameworks.map((fw) => (
+                <Disclosure key={fw.slug}>
+                  {({ open }) => (
+                    <div>
+                      <Disclosure.Button className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-cream focus-ring">
+                        <span className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            checked={selectedFramework === fw.slug}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              setSelectedFramework(fw.slug);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-4 w-4 accent-primary"
+                          />
+                          <span className="flex flex-col">
+                            <span className="text-sm font-semibold text-ink">{fw.name}</span>
+                            {fw.best_for && (
+                              <span className="text-xs text-ink-muted">{fw.best_for}</span>
+                            )}
+                          </span>
+                        </span>
+                        <ChevronUpIcon
+                          className={`h-4 w-4 shrink-0 text-ink-muted transition-transform duration-200 ${
+                            open ? "" : "rotate-180"
+                          }`}
+                        />
+                      </Disclosure.Button>
+                      <Disclosure.Panel className="px-5 pb-4 text-sm text-ink-soft">
+                        {Array.isArray(fw.steps) && fw.steps.length > 0 && (
+                          <ul className="space-y-2">
+                            {fw.steps.map((step, idx) => (
+                              <li key={idx} className="flex gap-2">
+                                <span className="font-bold text-primary-700">
+                                  {(typeof step === "object" && step?.letter) || idx + 1}.
+                                </span>
+                                <span>
+                                  {typeof step === "string" ? (
+                                    step
+                                  ) : (
+                                    <>
+                                      {step?.label && (
+                                        <span className="font-semibold text-ink">{step.label}: </span>
+                                      )}
+                                      {step?.description || ""}
+                                    </>
+                                  )}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </Disclosure.Panel>
+                    </div>
+                  )}
+                </Disclosure>
+              ))}
             </div>
-            <div className="bg-[#FFEEE3]  md:min-h-40 rounded-xl p-4 flex flex-col items-center justify-center shadow-sm">
-              <span className="text-sm">{modes[1]?.name}</span>
-              <span className="text-2xl font-bold text-red-500 mt-2">{modes[1]?.recordings.length}</span>
-            </div>
-            <div className="bg-[#FFEEE3]   md:min-h-40 rounded-xl p-4 flex flex-col items-center justify-center shadow-sm">
-              <span className="text-sm">{modes[2]?.name}</span>
-              <span className="text-2xl font-bold text-red-500 mt-2">{modes[2]?.recordings.length}</span>
-            </div>
-            <div className="bg-[#FFEEE3]  md:min-h-40  rounded-xl p-4 flex flex-col items-center justify-center shadow-sm">
-              <span className="text-sm">{modes[3]?.name}</span>
-              <span className="text-2xl font-bold text-red-500 mt-2">{modes[3]?.recordings.length}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Activity */}
-      <div className="h-[350px] flex flex-col justify-between pb-10">
-        <h2 className="text-lg md:text-xl font-bold mb-4">Total day recording</h2>
-
-        <div className="flex items-end  justify-between h-40 px-2">
-          {activity_log.map((entry, idx) => {
-            // 📊 Bar scaling
-            const maxHeight = 250;
-            const maxTime = Math.max(...activity_log.map(e => e.time_spent_minutes || 0));
-            let barHeight = 0;
-
-            if (maxTime > 0) {
-              barHeight = Math.round((entry.time_spent_minutes || 0) / maxTime * maxHeight);
-            }
-
-            // 🔹 Ensure ALL bars are visible (even 0 minutes)
-            const minBarHeight = 5; 
-            if (barHeight < minBarHeight) {
-              barHeight = minBarHeight;
-            }
-
-          const time=(Math.round(entry.time_spent_minutes)/60).toFixed(1)
-          const [year, month, day] = entry.date.split("-").map(Number);
-          const entryDate = new Date(year, month - 1, day); // month is 0-indexed
-          const dayName = entryDate.toLocaleDateString("en-US", { weekday: "short" });
-
-            // 🔥 Check if this entry is today (local-safe)
-            const today = new Date();
-            const todayStr = today.getFullYear() + "-" +
-
-              String(today.getMonth() + 1).padStart(2, "0") + "-" +
-              String(today.getDate()).padStart(2, "0");
-            
-            const isToday = entry.date === todayStr;
-
-            return (
-              <div key={idx} className="flex flex-col items-center">
-                {/* Bar */}
-                <div
-                  style={{ height: `${barHeight}px` }}
-                  className={`w-6 rounded-lg transition-all duration-300 
-                    ${isToday ? "bg-[#F25019] shadow-md" : "bg-[#FFEEE3]"}`}
-                ></div>
-
-                {/* Label */}
-                <span className={`text-xs mt-1 ${isToday ? "font-bold text-[#F25019]" : "text-gray-500"}`}>
-                  {isToday ? "Today" : dayName}
-                </span>
-                <span className={`text-xs mt-1 ${isToday ? "font-bold text-[#F25019]" : "text-gray-500"}`}>
-                  {`${time}m`}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Trends Sparklines (9j) */}
-      {recordings.length >= 3 && trends?.trends && (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-lg md:text-xl font-bold mb-2">30-Day Trends</h2>
-
-          {/* Pace Chart */}
-          <div className="bg-white border border-gray-200 rounded-lg p-3">
-            <p className="text-xs font-semibold text-gray-600 mb-2">Pace (WPM)</p>
-            <ResponsiveContainer width="100%" height={100}>
-              <LineChart data={trends.trends}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis domain={["dataMin - 10", "dataMax + 10"]} tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => value.toFixed(1)} />
-                <Line type="monotone" dataKey="pace_wpm_avg" stroke="#F25019" isAnimationActive={false} dot={false} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-            {trends.summary && (
-              <p className="text-xs text-gray-600 mt-1">
-                Avg: {trends.summary.pace_wpm_avg?.toFixed(1)} WPM
-                {trends.trends[0]?.pace_wpm_avg && trends.trends[trends.trends.length - 1]?.pace_wpm_avg && (
-                  trends.trends[trends.trends.length - 1].pace_wpm_avg > trends.trends[0].pace_wpm_avg ? " ▲" : " ▼"
-                )}
-              </p>
+            {selectedFramework && (
+              <button
+                onClick={() => setSelectedFramework(null)}
+                className="mx-auto mt-3 block text-xs font-semibold text-ink-muted hover:text-primary-700 focus-ring"
+              >
+                Clear selection
+              </button>
             )}
-          </div>
-
-          {/* Fillers Chart */}
-          <div className="bg-white border border-gray-200 rounded-lg p-3">
-            <p className="text-xs font-semibold text-gray-600 mb-2">Filler Words</p>
-            <ResponsiveContainer width="100%" height={100}>
-              <LineChart data={trends.trends}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis domain={[0, "dataMax + 1"]} tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => value.toFixed(1)} />
-                <Line type="monotone" dataKey="filler_words_avg" stroke="#EF4444" isAnimationActive={false} dot={false} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-            {trends.summary && (
-              <p className="text-xs text-gray-600 mt-1">
-                Avg: {trends.summary.filler_words_avg?.toFixed(1)}
-                {trends.trends[0]?.filler_words_avg && trends.trends[trends.trends.length - 1]?.filler_words_avg && (
-                  trends.trends[trends.trends.length - 1].filler_words_avg < trends.trends[0].filler_words_avg ? " ▼" : " ▲"
-                )}
-              </p>
-            )}
-          </div>
-
-          {/* Hedges Chart */}
-          <div className="bg-white border border-gray-200 rounded-lg p-3">
-            <p className="text-xs font-semibold text-gray-600 mb-2">Hedges</p>
-            <ResponsiveContainer width="100%" height={100}>
-              <LineChart data={trends.trends}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis domain={[0, "dataMax + 1"]} tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => value.toFixed(1)} />
-                <Line type="monotone" dataKey="hedge_count_avg" stroke="#F59E0B" isAnimationActive={false} dot={false} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-            {trends.summary && (
-              <p className="text-xs text-gray-600 mt-1">
-                Avg: {trends.summary.hedge_count_avg?.toFixed(1)}
-                {trends.trends[0]?.hedge_count_avg && trends.trends[trends.trends.length - 1]?.hedge_count_avg && (
-                  trends.trends[trends.trends.length - 1].hedge_count_avg < trends.trends[0].hedge_count_avg ? " ▼" : " ▲"
-                )}
-              </p>
-            )}
-          </div>
-
-          {/* Concreteness Chart */}
-          <div className="bg-white border border-gray-200 rounded-lg p-3">
-            <p className="text-xs font-semibold text-gray-600 mb-2">Concreteness (%)</p>
-            <ResponsiveContainer width="100%" height={100}>
-              <LineChart data={trends.trends}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis domain={[0, 1]} tick={{ fontSize: 10 }} tickFormatter={(val) => `${(val * 100).toFixed(0)}%`} />
-                <Tooltip formatter={(value) => `${(value * 100).toFixed(0)}%`} />
-                <Line type="monotone" dataKey="concreteness_ratio_avg" stroke="#10B981" isAnimationActive={false} dot={false} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-            {trends.summary && (
-              <p className="text-xs text-gray-600 mt-1">
-                Avg: {(trends.summary.concreteness_ratio_avg * 100)?.toFixed(0)}%
-                {trends.trends[0]?.concreteness_ratio_avg && trends.trends[trends.trends.length - 1]?.concreteness_ratio_avg && (
-                  trends.trends[trends.trends.length - 1].concreteness_ratio_avg > trends.trends[0].concreteness_ratio_avg ? " ▲" : " ▼"
-                )}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Placeholder if not enough recordings (9j) */}
-      {recordings.length < 3 && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-          <p className="text-sm text-gray-600">Complete 3+ recordings to see 30-day trends</p>
-        </div>
-      )}
+          </section>
+        )}
       </div>
     </div>
   );
-}
+};
+
+export default Overview;
