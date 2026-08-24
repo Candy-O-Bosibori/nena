@@ -112,7 +112,14 @@ export const Login = () => {
         <div className="grid w-full max-w-4xl overflow-hidden rounded-3xl border border-line bg-surface shadow-xl md:grid-cols-2">
           {/* Left side - Login form */}
           <div className="flex flex-col justify-center p-8 md:p-12">
-            <img className="mb-8 h-9 w-auto self-start object-contain" src={logo} alt="Nena" />
+            <button
+              type="button"
+              onClick={() => navigate('/overview')}
+              className="mb-8 self-start focus-ring rounded-lg"
+              aria-label="Continue browsing without signing in"
+            >
+              <img className="h-9 w-auto object-contain" src={logo} alt="Nena" />
+            </button>
 
             <h1 className="font-display text-3xl font-normal tracking-tight text-ink">Welcome back</h1>
             <p className="mt-2 text-sm text-ink-soft">
@@ -203,6 +210,18 @@ export const Login = () => {
                 onClick={() => navigate('/signup', { state: returnTo ? { returnTo } : undefined })}
               >
                 Register for free
+              </button>
+            </p>
+
+            {/* Anonymous browsing link */}
+            <p className="mt-2 text-center text-sm text-ink-soft">
+              Just looking around?{" "}
+              <button
+                type="button"
+                className="font-bold text-primary hover:underline"
+                onClick={() => navigate('/overview')}
+              >
+                Continue without an account
               </button>
             </p>
           </div>
