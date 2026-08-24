@@ -1,4 +1,5 @@
 import axios from "axios";
+import { API_BASE_URL } from "../utils/apiBase";
 
 let isRefreshing = false;
 let failedQueue = [];
@@ -33,7 +34,7 @@ const refreshAccessToken = async () => {
     // Send the refresh token in the Authorization header (what the server
     // expects); the body is kept as a compatibility fallback.
     const response = await axios.post(
-      "http://127.0.0.1:5000/refresh",
+      `${API_BASE_URL}/refresh`,
       { token: refreshToken },
       { headers: { Authorization: `Bearer ${refreshToken}` } }
     );
@@ -64,7 +65,7 @@ const refreshAccessToken = async () => {
 };
 
 const api = axios.create({
-  baseURL: "http://127.0.0.1:5000",
+  baseURL: API_BASE_URL,
 });
 
 api.interceptors.request.use(

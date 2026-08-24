@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { jwtDecode } from 'jwt-decode';
 import api from "../../api/api";
 import { fmt, fmtInt, fmtPercent } from "../../utils/format";
+import { API_BASE_URL } from "../../utils/apiBase";
 import Button from "../../Components/ui/Button";
 
 // coach_notes arrives as {opening, clarity, evidence, conclusion}. List the known
@@ -49,7 +50,7 @@ export const Feedback = () => {
     const userId = decodedToken.sub.id;
 
     // Fetch recordings
-    fetch('http://127.0.0.1:5000/recordings', {
+    fetch(`${API_BASE_URL}/recordings`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -93,7 +94,7 @@ export const Feedback = () => {
     const handleDeleteRecording = async (id) => {
   const token = localStorage.getItem("access_token");
   try {
-    const response = await fetch(`http://127.0.0.1:5000/recordingById/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/recordingById/${id}`, {
       method: "DELETE",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -229,7 +230,7 @@ const recordingsByDate = recordings
                   <video
                     controls
                     className="w-full rounded-lg mb-4"
-                    src={`http://127.0.0.1:5000${selectedRecording.video_url}`}
+                    src={`${API_BASE_URL}${selectedRecording.video_url}`}
                   />
                 )}
 

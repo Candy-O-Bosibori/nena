@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Env files -- local API URL overrides, never committed
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

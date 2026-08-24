@@ -3,6 +3,7 @@ import { CiTrash } from "react-icons/ci";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { API_BASE_URL } from "../../utils/apiBase";
 
 export const Recording = () => {
   const location = useLocation();
@@ -134,7 +135,7 @@ const submitRecording = async () => {
   formData.append("video", blob, `recording-${Date.now()}.webm`);
 
   try {
-    const response = await fetch("http://127.0.0.1:5000/recordings", {
+    const response = await fetch(`${API_BASE_URL}/recordings`, {
       headers: { Authorization: "Bearer " + token },
       method: "POST",
       body: formData,

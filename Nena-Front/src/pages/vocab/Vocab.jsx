@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaTrash, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
 // import jwtDecode from 'jwt-decode';
+import { API_BASE_URL } from '../../utils/apiBase';
 
 export const Vocab = () => {
   const [words, setWords] = useState([]);
@@ -15,7 +16,7 @@ export const Vocab = () => {
       if (!token) return;
 
       try {
-        const response = await fetch('http://127.0.0.1:5000/words', {
+        const response = await fetch(`${API_BASE_URL}/words`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -39,7 +40,7 @@ export const Vocab = () => {
 
     const token = localStorage.getItem('access_token');
     try {
-      const response = await fetch('http://127.0.0.1:5000/words', {
+      const response = await fetch(`${API_BASE_URL}/words`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -65,7 +66,7 @@ export const Vocab = () => {
   const handleDeleteWord = async (id) => {
     const token = localStorage.getItem('access_token');
     try {
-      const response = await fetch(`http://127.0.0.1:5000/wordsById/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/wordsById/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -92,7 +93,7 @@ export const Vocab = () => {
 
     const token = localStorage.getItem('access_token');
     try {
-      const response = await fetch(`http://127.0.0.1:5000/wordsById/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/wordsById/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

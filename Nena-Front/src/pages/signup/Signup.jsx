@@ -8,6 +8,7 @@ import github from "../../assets/github.png";
 import google from "../../assets/google.png";
 import facebook from "../../assets/facebook.png";
 import image from "../../assets/image.png";
+import { API_BASE_URL } from "../../utils/apiBase";
 
 export const Signup = () => {
     const [name, setName] = useState('');
@@ -29,7 +30,7 @@ export const Signup = () => {
         const refreshToken = localStorage.getItem('refreshToken');
 
         try {
-            const response = await fetch('http://127.0.0.1:5000/signup', {
+            const response = await fetch(`${API_BASE_URL}/signup`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${refreshToken}`
@@ -69,7 +70,7 @@ export const Signup = () => {
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://127.0.0.1:5000/signup', {
+            const response = await fetch(`${API_BASE_URL}/signup`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
