@@ -10,9 +10,7 @@ function App() {
   const { resolved } = useTheme();
 
   return (
-    <Router       
-      basename={import.meta.env.DEV ? '/' : '/nena-Front/'}
-    >
+    <Router>
       <Routes>
 
 
