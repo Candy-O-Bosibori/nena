@@ -65,6 +65,7 @@ with placeholder values.
 | `ASSEMBLYAI_API_KEY` | Transcription |
 | `ANTHROPIC_API_KEY` | Coaching feedback generation |
 | `TRANSCRIPTION_LANGUAGE` | Language code passed to AssemblyAI (default `en`) |
+| `CORS_ORIGINS` | Comma-separated allowed frontend origin(s), e.g. `https://your-frontend.example.com`. Unset/empty locally defaults to `*`; set explicitly in every deployed environment. |
 
 Never commit real values — `.env` is gitignored; `.env.example` holds only
 placeholders and is the thing that's actually tracked.
@@ -191,6 +192,5 @@ Before deploying to a new environment for the first time:
 1. Set every variable in [Environment variables](#environment-variables) with
    real values in the host's dashboard/secret store — never commit them.
 2. Run `flask db upgrade` against the target database once.
-3. Narrow `CORS(app, resources={r"/*": {"origins": "*"}})` in `app.py` to the
-   actual deployed frontend origin — the wildcard is fine for local dev, not
-   for a real deployment.
+3. Set `CORS_ORIGINS` to the actual deployed frontend origin(s) — the
+   wildcard default is fine for local dev, not for a real deployment.

@@ -38,7 +38,15 @@ api = Api(app)
 app.handle_exception = Flask.handle_exception.__get__(app, Flask)
 app.handle_user_exception = Flask.handle_user_exception.__get__(app, Flask)
 
-CORS(app, resources={r"/*": {"origins": "*"}})
+# Local dev has no reason to restrict origins; production sets CORS_ORIGINS
+# to the real deployed frontend URL(s) (comma-separated) so the wildcard
+# doesn't ship to prod.
+_cors_origins_env = os.environ.get('CORS_ORIGINS')
+_cors_origins = (
+    [o.strip() for o in _cors_origins_env.split(',') if o.strip()]
+    if _cors_origins_env else '*'
+)
+CORS(app, resources={r"/*": {"origins": _cors_origins}})
 
 from resources import auth, users, modes, topics, recordings, activity_logs, feedback, words, coaching_stream, adaptive_selection, frameworks
 
