@@ -1,0 +1,11 @@
+venv/
+tests/
+.env
+.env.*
+__pycache__/
+*.pyc
+test_assemblyai.py
+static/
+instance/
+.git/
+.pytest_cache/
