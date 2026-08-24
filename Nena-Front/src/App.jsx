@@ -18,18 +18,26 @@ function App() {
 
         <Route path="/signin" element={<Login />} /> 
         <Route path="/signup" element={<Signup />} /> 
-        <Route path="/" element={<Navigate to="/signin" />} />
+        <Route path="/" element={<Navigate to="/overview" replace />} />
 
         
-        {routes.map((route, index) => (
-          (route.path !== "/signin" && route.path !== "/signup") &&
-          <Route key={index} path={route.path} element={
-            <AuthWrapper Sidebar={route.Sidebar}>
-              <route.Element />
-            </AuthWrapper>
-            
-          }/>
-        ))}
+        {routes.map((route, index) => {
+          if (route.path === "/signin" || route.path === "/signup") return null;
+          const element = <route.Element />;
+          return (
+            <Route
+              key={index}
+              path={route.path}
+              element={
+                route.isAuthenticated === false ? (
+                  element
+                ) : (
+                  <AuthWrapper Sidebar={route.Sidebar}>{element}</AuthWrapper>
+                )
+              }
+            />
+          );
+        })}
        
 
       </Routes>

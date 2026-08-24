@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import { PiEyeLight } from "react-icons/pi";
 import { PiEyeSlash } from "react-icons/pi";
@@ -14,6 +14,8 @@ export const Signup = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const navigate = useNavigate();
+    const location = useLocation();
+    const returnTo = location.state?.returnTo;
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -94,7 +96,7 @@ export const Signup = () => {
                 // used to get new access token later
                 localStorage.setItem("refreshToken", data.refresh_token);
 
-                navigate("/overview");
+                navigate(returnTo || "/overview");
 
             } else {
                 setErrorMessage("Access token is missing in the response");
@@ -199,7 +201,7 @@ export const Signup = () => {
               <button
                 type="button"
                 className="font-bold text-primary hover:underline"
-                onClick={() => navigate('/signin')}
+                onClick={() => navigate('/signin', { state: returnTo ? { returnTo } : undefined })}
               >
                 Sign in
               </button>

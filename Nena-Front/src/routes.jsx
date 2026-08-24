@@ -32,7 +32,7 @@ const routes = [
                 <Overview />
             </Layout>
         ),
-        isAuthenticated: true,
+        isAuthenticated: false,
     },
     {
         path: "/feedback",
@@ -59,7 +59,7 @@ const routes = [
                 <Practice />
             </Layout>
         ),
-        isAuthenticated: true,
+        isAuthenticated: false,
     },
     {
         path: "/profile",

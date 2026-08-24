@@ -1,12 +1,10 @@
 from flask import make_response
-from flask_jwt_extended import jwt_required
 from flask_restful import Resource
 
 from models import Mode
 
 
 class Modes(Resource):
-    @jwt_required()
     def get(self):
         modes = Mode.query.all()
         # Opt back into a shallow recordings list; the frontend's stat boxes read

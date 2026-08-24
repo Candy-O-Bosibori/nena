@@ -2,7 +2,6 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 
 from flask import request, make_response
-from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restful import Resource
 from sqlalchemy import func
 
@@ -10,7 +9,6 @@ from models import db, Topic, Mode, Recording
 
 
 class Topics(Resource):
-    @jwt_required()
     def get(self):
         """Get all active topics"""
         topics = Topic.query.filter_by(active=True).all()
@@ -19,7 +17,6 @@ class Topics(Resource):
 
 
 class TopicsRandom(Resource):
-    @jwt_required()
     def get(self):
         """Get a random topic with optional filters
 
@@ -28,8 +25,6 @@ class TopicsRandom(Resource):
         - difficulty: 'easy', 'medium', 'hard', or 'random'
         - tags: comma-separated tag filters (e.g., 'pacing,structure')
         """
-        user_id = get_jwt_identity()
-
         mode_slug = request.args.get('mode')
         difficulty = request.args.get('difficulty', 'random')
         tags_param = request.args.get('tags', '')
@@ -65,7 +60,6 @@ class TopicsRandom(Resource):
 
 
 class TopicsToday(Resource):
-    @jwt_required()
     def get(self):
         """Get today's Daily Reflection prompt
 

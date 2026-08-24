@@ -5,14 +5,18 @@ import "react-toastify/dist/ReactToastify.css";
 import api from "../../api/api";
 import CircularTimer from "../../Components/CircularTimer/CircularTimer";
 import Button from "../../Components/ui/Button";
+import { saveDraft, getPendingDraftId, loadDraft, deleteDraft } from "../../utils/draftRecording";
 
 export const Practice = () => {
   const { modeSlug } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Get topic/mode/framework from router state
-  const { topic: routerTopic, mode: routerMode, selectedFramework } = location.state || {};
+  // Get topic/mode/framework from router state, or from a resumed draft
+  // (see the resume effect below) after coming back from sign-up/sign-in.
+  const [resumedContext, setResumedContext] = useState(null);
+  const { topic: routerTopic, mode: routerMode, selectedFramework } =
+    resumedContext || location.state || {};
 
   const audioRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -25,6 +29,7 @@ export const Practice = () => {
   const [paused, setPaused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [recordingId, setRecordingId] = useState(null);
   const [micLabel, setMicLabel] = useState("");
   // Mirrors recordedChunksRef in React state: mutating a ref's .current
@@ -32,16 +37,56 @@ export const Practice = () => {
   // own state to actually show up once a recording has stopped.
   const [previewUrl, setPreviewUrl] = useState(null);
 
-  // Guard: redirect if no router state (direct URL navigation)
+  // If we're coming back from sign-up/sign-in with a pending draft recording,
+  // resolve it before the "no topic selected" guard below gets a chance to
+  // bounce us to /overview -- there's no router state on this navigation,
+  // only the draft id.
+  const [resumingDraft, setResumingDraft] = useState(() => !!getPendingDraftId());
+  const [draftId, setDraftId] = useState(null);
+
   useEffect(() => {
-    if (!location.state?.topic || !location.state?.mode) {
+    const pendingId = getPendingDraftId();
+    if (!pendingId) {
+      setResumingDraft(false);
+      return;
+    }
+
+    let cancelled = false;
+    loadDraft(pendingId).then((record) => {
+      if (cancelled) return;
+      if (record) {
+        setResumedContext(record.meta);
+        setDraftId(pendingId);
+        const blob = record.blob;
+        recordedChunksRef.current = [blob];
+        setPreviewUrl(URL.createObjectURL(blob));
+        toast.success("Welcome back — your recording is ready to submit.", {
+          autoClose: 3000,
+          position: "top-center",
+        });
+      } else {
+        // Expired or missing: nothing to resume, drop the stale pointer.
+        deleteDraft(pendingId);
+      }
+      setResumingDraft(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Guard: redirect if no router state and no draft to resume (direct URL navigation)
+  useEffect(() => {
+    if (resumingDraft) return;
+    if (!resumedContext && (!location.state?.topic || !location.state?.mode)) {
       toast.error("No topic selected — pick one from Overview first", {
         autoClose: 2500,
         position: "top-center",
       });
       navigate("/overview", { replace: true });
     }
-  }, []);
+  }, [resumingDraft]);
 
   // Get mic permission (bug fix #2: use streamRef for cleanup)
   useEffect(() => {
@@ -167,10 +212,33 @@ export const Practice = () => {
     });
   };
 
+  // Save the in-progress recording (blob + topic/mode/framework context) so
+  // it survives the navigation to /signup or /signin, then send the user
+  // there. Practice.jsx's resume effect picks it back up when they land here
+  // again with the pending draft id.
+  const goToAuthWithDraft = async (destination) => {
+    if (recordedChunksRef.current.length === 0) {
+      navigate(destination);
+      return;
+    }
+    const blob = new Blob(recordedChunksRef.current, { type: "audio/webm" });
+    await saveDraft(blob, {
+      topic: routerTopic,
+      mode: routerMode,
+      selectedFramework: selectedFramework ?? null,
+    });
+    navigate(destination, { state: { returnTo: `/practice/${modeSlug}` } });
+  };
+
   // Submit recording
   const submitRecording = async () => {
     if (recordedChunksRef.current.length === 0) {
       toast.error("No recording available.");
+      return;
+    }
+
+    if (!localStorage.getItem("access_token")) {
+      setShowSignupPrompt(true);
       return;
     }
 
@@ -199,6 +267,10 @@ export const Practice = () => {
       recordedChunksRef.current = [];
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
+      if (draftId) {
+        deleteDraft(draftId);
+        setDraftId(null);
+      }
     } catch (error) {
       toast.error("Failed to submit recording");
       console.error("Submit error:", error);
@@ -341,6 +413,32 @@ export const Practice = () => {
               <Button onClick={() => navigate("/feedback")}>View feedback</Button>
               <Button onClick={() => navigate("/overview")} variant="ghost">
                 Practice again
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sign-up prompt: anonymous visitors can record and preview, but
+          submitting for feedback needs a real account (recordings are
+          tied to a user_id). */}
+      {showSignupPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl bg-surface p-8 shadow-2xl animate-pop">
+            <h2 className="font-display text-xl font-normal tracking-tight text-ink">
+              Sign up to get feedback
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+              We'll keep this recording ready for you — create a free account (or sign in) and
+              you'll land right back here to submit it.
+            </p>
+            <div className="mt-6 flex flex-col gap-2">
+              <Button onClick={() => goToAuthWithDraft("/signup")}>Sign up</Button>
+              <Button onClick={() => goToAuthWithDraft("/signin")} variant="ghost">
+                I already have an account
+              </Button>
+              <Button onClick={() => setShowSignupPrompt(false)} variant="ghost">
+                Keep practicing
               </Button>
             </div>
           </div>

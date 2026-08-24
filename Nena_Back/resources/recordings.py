@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+import threading
 import traceback
 
 from flask import request, make_response
@@ -62,6 +63,16 @@ class Recordings(Resource):
             print("#" * 68)
 
             audio_path = extract_audio(filepath, output_dir=temp_dir)
+
+            # Duration (ffprobe metadata read) doesn't depend on transcription
+            # or vice versa -- run it on a side thread so it overlaps with the
+            # AssemblyAI wait instead of adding to the total.
+            duration_result = {}
+            duration_thread = threading.Thread(
+                target=lambda: duration_result.update(seconds=get_video_duration(filepath))
+            )
+            duration_thread.start()
+
             transcription = None
             transcription_error = None
             try:
@@ -77,7 +88,8 @@ class Recordings(Resource):
                 transcription = None
                 transcription_error = str(e)
 
-            duration_seconds = get_video_duration(filepath)
+            duration_thread.join()
+            duration_seconds = duration_result.get("seconds", 0)
 
             new_recording = Recording(
                 transcription=transcription,

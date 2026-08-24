@@ -5,6 +5,7 @@ import { Disclosure, Listbox } from "@headlessui/react";
 import { ChevronUpIcon, ChevronUpDownIcon, CheckIcon } from "@heroicons/react/20/solid";
 import SpinReveal from "../../Components/SpinReveal/SpinReveal";
 import Button from "../../Components/ui/Button";
+import ThemeToggle from "../../Components/ui/ThemeToggle";
 
 const PLACEHOLDER_TOPICS = [
   "Spinning the wheel…",
@@ -51,26 +52,25 @@ export const Overview = () => {
   const [frameworks, setFrameworks] = useState([]);
   const [selectedFramework, setSelectedFramework] = useState(null);
 
-  // Initialize active mode once modes load
+  // Initialize active mode once modes load. Always defaults to Random Topic
+  // (or the first mode if that slug is ever missing) -- the "pick up where
+  // you left off" card can recommend a different mode's topic, but that's a
+  // suggestion to click into, not something that should hijack which tab is
+  // selected on load.
   useEffect(() => {
     if (modes.length > 0 && !activeModeSlug) {
-      setActiveModeSlug(nextPractice?.mode?.slug || modes[0]?.slug);
+      const randomTopicMode = modes.find((m) => m.slug === "random-topic");
+      setActiveModeSlug(randomTopicMode?.slug || modes[0]?.slug);
     }
-  }, [modes, activeModeSlug, nextPractice?.mode?.slug]);
+  }, [modes, activeModeSlug]);
 
   const activeMode = modes.find((m) => m.slug === activeModeSlug);
   const accent = activeMode?.accent_color || "#DC9750";
 
-  // Main data fetch
+  // Main data fetch. Runs regardless of auth state -- modes/topics are public,
+  // and next-practice/frameworks degrade gracefully via the .catch() fallbacks
+  // below when there's no token.
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    const refreshToken = localStorage.getItem("refreshToken");
-
-    if (!token || !refreshToken) {
-      setLoading(false);
-      return;
-    }
-
     const fetchData = async () => {
       try {
         const [modesRes, nextPracticeRes, frameworksRes] = await Promise.all([
@@ -202,8 +202,18 @@ export const Overview = () => {
     );
   }
 
+  const isSignedIn = Boolean(localStorage.getItem("access_token"));
+
   return (
     <div className="min-h-screen bg-cream">
+      {!isSignedIn && (
+        <div className="flex items-center justify-end gap-3 px-5 pt-6">
+          <ThemeToggle />
+          <Button onClick={() => navigate("/signin")} size="sm">
+            Sign in
+          </Button>
+        </div>
+      )}
       <div className="mx-auto flex w-full max-w-3xl  flex-col items-center px-5 pb-24 pt-8 md:pt-12">
         {/* ---------- Continue where you left off ---------- */}
         {nextPractice?.topic && (
@@ -370,7 +380,7 @@ export const Overview = () => {
             <p className="mb-3 text-center text-xs text-ink-muted">
               A framework is a simple shape for your answer, made of a few short beats to hit in order. Pick one if you want a bit of scaffolding, or skip it and speak freely.
             </p>
-            <div className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+            <div className="divide-y divide-line overflow-hidden rounded-2xl bg-surface">
               {frameworks.map((fw) => (
                 <Disclosure key={fw.slug}>
                   {({ open }) => (
@@ -385,7 +395,7 @@ export const Overview = () => {
                               setSelectedFramework(fw.slug);
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            className="h-4 w-4 accent-primary"
+                            className="accent-primary"
                           />
                           <span className="flex flex-col">
                             <span className="text-sm font-semibold text-ink">{fw.name}</span>

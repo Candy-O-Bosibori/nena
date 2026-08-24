@@ -63,28 +63,6 @@ def probe_audio(audio_path):
         return {}
 
 
-def detect_speech_seconds(audio_path):
-    """Seconds of non-silent audio, via ffmpeg's silencedetect.
-
-    A clip can be loud (knocks, noise) yet contain almost no sustained sound.
-    This separates "there is continuous audio here" from "there are a few spikes".
-    """
-    try:
-        result = subprocess.run(
-            ["ffmpeg", "-i", audio_path, "-af", "silencedetect=noise=-40dB:d=0.5",
-             "-f", "null", "-"],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        total_silence = 0.0
-        for line in result.stderr.splitlines():
-            if "silence_duration:" in line:
-                total_silence += float(line.split("silence_duration:")[1].strip().split()[0])
-        return total_silence
-    except Exception as e:
-        print(f"[TRANSCRIBE] silencedetect failed: {e}")
-        return None
-
-
 def transcribe_audio(audio_path):
     bar = "=" * 68
     print("\n" + bar)
@@ -106,24 +84,11 @@ def transcribe_audio(audio_path):
     print(f"[TRANSCRIBE] duration  : {info.get('duration')} s")
 
     # --- 2. Is there actually speech-like audio in it? -------------------------
+    # (volumedetect only -- silencedetect used to run here too, but it fed
+    # nothing except a log line, at the cost of a second full decode pass.)
     mean_db, peak_db = measure_audio_level(audio_path)
     print(f"[TRANSCRIBE] mean vol  : {mean_db} dB")
     print(f"[TRANSCRIBE] peak vol  : {peak_db} dB")
-
-    silence_s = detect_speech_seconds(audio_path)
-    if silence_s is not None:
-        try:
-            dur = float(info.get("duration") or 0)
-            audible = max(0.0, dur - silence_s)
-            pct = (audible / dur * 100) if dur else 0
-            print(f"[TRANSCRIBE] silence   : {silence_s:.1f}s of {dur:.1f}s"
-                  f"  -> {audible:.1f}s audible ({pct:.0f}%)")
-            if dur and pct < 10:
-                print("[TRANSCRIBE] *** WARNING: under 10% of this clip has sustained "
-                      "sound. Mostly silence with occasional spikes -- this is what a "
-                      "wrong/muted mic looks like. ***")
-        except (TypeError, ValueError):
-            print(f"[TRANSCRIBE] silence   : {silence_s:.1f}s total")
 
     # Keep a copy so you can listen to exactly what was sent.
     debug_dir = os.getenv("TRANSCRIPTION_DEBUG_DIR")

@@ -1,4 +1,5 @@
 """Adaptive selection endpoints for next practice and trends."""
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 from flask import make_response
@@ -61,9 +62,16 @@ class NextPractice(Resource):
                     "is_random": False
                 }, 200)
 
-        # No targeted recommendation yet - return random topic
-        random_topic = Topic.query.filter_by(active=True).order_by(func.random()).first()
-        if random_topic:
+        # No targeted recommendation yet - fall back to a topic that's
+        # picked once per day per user, not re-randomized on every request.
+        # Otherwise "pick up where you left off" changes on every page
+        # refresh, which defeats the point of the prompt.
+        topics = Topic.query.filter_by(active=True).order_by(Topic.id).all()
+        if topics:
+            today_str = datetime.now(timezone.utc).date().isoformat()
+            hash_input = f"{today_str}:{user_id}"
+            hash_value = int(hashlib.md5(hash_input.encode()).hexdigest(), 16)
+            random_topic = topics[hash_value % len(topics)]
             mode = Mode.query.get(random_topic.mode_id)
             return make_response({
                 "topic": random_topic.to_dict(),

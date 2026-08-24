@@ -6,6 +6,10 @@ export const Layout = ({ Sidebar, children }) => {
     const [isLargeScreen, setIsLargeScreen] = useState(
         typeof window !== "undefined" ? window.innerWidth >= 1024 : true
     );
+    // The nav rail only makes sense once there's an account to navigate
+    // between pages of -- an anonymous visitor on the landing page gets the
+    // Sign in button instead (rendered by the page itself).
+    const showSidebar = Boolean(Sidebar) && typeof window !== "undefined" && !!localStorage.getItem("access_token");
 
     useEffect(() => {
         const handleResize = () => setIsLargeScreen(window.innerWidth >= 1024);
@@ -21,7 +25,7 @@ export const Layout = ({ Sidebar, children }) => {
     return (
         <div className="relative min-h-screen bg-cream lg:flex">
             {/* Mobile menu toggle */}
-            {!isLargeScreen && (
+            {showSidebar && !isLargeScreen && (
                 <button
                     onClick={() => setIsSidebarOpen((open) => !open)}
                     aria-label={isSidebarOpen ? "Close menu" : "Open menu"}
@@ -32,7 +36,7 @@ export const Layout = ({ Sidebar, children }) => {
             )}
 
             {/* Backdrop for the mobile drawer */}
-            {!isLargeScreen && isSidebarOpen && (
+            {showSidebar && !isLargeScreen && isSidebarOpen && (
                 <div
                     onClick={() => setIsSidebarOpen(false)}
                     className="fixed inset-0 z-10 bg-ink/30 backdrop-blur-sm"
@@ -41,19 +45,21 @@ export const Layout = ({ Sidebar, children }) => {
             )}
 
             {/* Sidebar: fixed rail on desktop, slide-over drawer on mobile */}
-            <aside
-                className={[
-                    "z-20 w-64 shrink-0 transition-transform duration-300",
-                    isLargeScreen
-                        ? "fixed inset-y-0 left-0"
-                        : `fixed inset-y-0 left-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`,
-                ].join(" ")}
-            >
-                {Sidebar && <Sidebar />}
-            </aside>
+            {showSidebar && (
+                <aside
+                    className={[
+                        "z-20 w-64 shrink-0 transition-transform duration-300",
+                        isLargeScreen
+                            ? "fixed inset-y-0 left-0"
+                            : `fixed inset-y-0 left-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`,
+                    ].join(" ")}
+                >
+                    <Sidebar />
+                </aside>
+            )}
 
             {/* Content */}
-            <main className="min-w-0 flex-1 lg:ml-64">
+            <main className={`min-w-0 flex-1 ${showSidebar ? "lg:ml-64" : ""}`}>
                 {children}
             </main>
         </div>
