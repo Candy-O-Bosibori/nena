@@ -24,7 +24,6 @@ const routes = [
         layout: "None",
         Sidebar: null,
     },
-    
     {
         path: "/overview",
         Element: () => (

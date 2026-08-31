@@ -4,11 +4,10 @@ import { jwtDecode } from 'jwt-decode';
 import { PiEyeLight } from "react-icons/pi";
 import { PiEyeSlash } from "react-icons/pi";
 import logo from "../../assets/logo.png";
-import github from "../../assets/github.png";
 import google from "../../assets/google.png";
-import facebook from "../../assets/facebook.png";
 import image from "../../assets/image.png";
 import { API_BASE_URL } from "../../utils/apiBase";
+import { useGoogleSignIn } from "../../utils/useGoogleSignIn";
 
 export const Login = () => {
     const [email, setEmail] = useState('');
@@ -19,6 +18,7 @@ export const Login = () => {
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [rememberMe, setRememberMe] = useState(false);
 
 
     const togglePasswordVisibility = () => {
@@ -63,6 +63,23 @@ export const Login = () => {
         }
     }, []);
 
+    const applySession = (data) => {
+        if (!data.access_token) {
+            setErrorMessage("Access token is missing in the response");
+            return;
+        }
+        // Saves the access token into the browser’s localStorage so the user stays logged in.
+        localStorage.setItem("access_token", data.access_token);
+        // used to get new access token later
+        localStorage.setItem("refreshToken", data.refresh_token);
+        navigate(returnTo || "/overview");
+    };
+
+    const { promptGoogleSignIn } = useGoogleSignIn({
+        onSuccess: applySession,
+        onError: setErrorMessage,
+    });
+
     const handleSubmit = async (event) => {
         event.preventDefault();
         setErrorMessage('');
@@ -76,7 +93,8 @@ export const Login = () => {
                 },
                 body: JSON.stringify({
                     email: email,
-                    password: password
+                    password: password,
+                    remember_me: rememberMe
                 }),
             });
             const data = await response.json();
@@ -88,23 +106,12 @@ export const Login = () => {
                 return;
             }
 
-            
-            if (data.access_token) {
-                // Saves the access token into the browser’s localStorage so the user stays logged in.
-                localStorage.setItem("access_token", data.access_token);
-                // used to get new access token later
-                localStorage.setItem("refreshToken", data.refresh_token);
-
-                navigate(returnTo || "/overview");
-
-            } else {
-                setErrorMessage("Access token is missing in the response");
-            }
+            applySession(data);
         } catch (error) {
             console.error("Error:", error);
             setErrorMessage("Something went wrong. Please try again.");
         }
-        setIsLoading(false); 
+        setIsLoading(false);
     };
 
     return (
@@ -166,14 +173,16 @@ export const Login = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center pt-1">
                 <label className="flex items-center gap-2 text-sm text-ink-soft">
-                  <input type="checkbox" className="h-4 w-4 rounded accent-primary" />
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={e => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 rounded accent-primary"
+                  />
                   Remember me
                 </label>
-                <button type="button" className="text-sm font-semibold text-primary hover:underline">
-                  Forgot password?
-                </button>
               </div>
 
               <button
@@ -196,9 +205,13 @@ export const Login = () => {
             </div>
 
             {/* Social login */}
-            <button className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-surface py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-ring">
+            <button
+              type="button"
+              onClick={promptGoogleSignIn}
+              className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-surface py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-ring"
+            >
               <img src={google} alt="" className="h-5 w-5" />
-              Google
+              Continue with Google
             </button>
 
             {/* Register link */}

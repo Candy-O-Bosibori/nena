@@ -4,11 +4,10 @@ import { jwtDecode } from 'jwt-decode';
 import { PiEyeLight } from "react-icons/pi";
 import { PiEyeSlash } from "react-icons/pi";
 import logo from "../../assets/logo.png";
-import github from "../../assets/github.png";
 import google from "../../assets/google.png";
-import facebook from "../../assets/facebook.png";
 import image from "../../assets/image.png";
 import { API_BASE_URL } from "../../utils/apiBase";
+import { useGoogleSignIn } from "../../utils/useGoogleSignIn";
 
 export const Signup = () => {
     const [name, setName] = useState('');
@@ -64,6 +63,23 @@ export const Signup = () => {
         }
     }, []);
 
+    const applySession = (data) => {
+        if (!data.access_token) {
+            setErrorMessage("Access token is missing in the response");
+            return;
+        }
+        // Saves the access token into the browser’s localStorage so the user stays logged in.
+        localStorage.setItem("access_token", data.access_token);
+        // used to get new access token later
+        localStorage.setItem("refreshToken", data.refresh_token);
+        navigate(returnTo || "/overview");
+    };
+
+    const { promptGoogleSignIn } = useGoogleSignIn({
+        onSuccess: applySession,
+        onError: setErrorMessage,
+    });
+
     const handleSubmit = async (event) => {
         event.preventDefault();
         setErrorMessage('');
@@ -90,23 +106,12 @@ export const Signup = () => {
                 return;
             }
 
-            
-            if (data.access_token) {
-                // Saves the access token into the browser’s localStorage so the user stays logged in.
-                localStorage.setItem("access_token", data.access_token);
-                // used to get new access token later
-                localStorage.setItem("refreshToken", data.refresh_token);
-
-                navigate(returnTo || "/overview");
-
-            } else {
-                setErrorMessage("Access token is missing in the response");
-            }
+            applySession(data);
         } catch (error) {
             console.error("Error:", error);
             setErrorMessage("Something went wrong. Please try again.");
         }
-        setIsLoading(false); 
+        setIsLoading(false);
     };
 
     return (
@@ -199,9 +204,13 @@ export const Signup = () => {
               <div className="h-px flex-1 bg-line" />
             </div>
 
-            <button className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-surface py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-ring">
+            <button
+              type="button"
+              onClick={promptGoogleSignIn}
+              className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-surface py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-ring"
+            >
               <img src={google} alt="" className="h-5 w-5" />
-              Google
+              Continue with Google
             </button>
 
             <p className="mt-8 text-center text-sm text-ink-soft">
