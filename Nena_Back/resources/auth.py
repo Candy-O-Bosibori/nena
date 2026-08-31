@@ -1,18 +1,20 @@
 import os
 from datetime import timedelta
 
+import requests as http_requests
+
 from flask import request, jsonify
 from flask_jwt_extended import (
     jwt_required, get_jwt_identity, create_access_token, create_refresh_token,
     decode_token
 )
 from flask_restful import Resource
-from google.auth.transport import requests as google_requests
-from google.oauth2 import id_token as google_id_token
 
 from models import db, User
 from models.user import validate_password_strength
 from extensions import bcrypt
+
+GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 
 # "Remember me" unchecked still needs to survive a page refresh (the client
 # holds it in sessionStorage rather than localStorage for that case), just
@@ -138,31 +140,40 @@ class SignUp(Resource):
 
 
 class GoogleSignIn(Resource):
-    """Exchange a Google Identity Services ID token for our own JWTs.
+    """Exchange a Google OAuth2 access token for our own JWTs.
 
-    Verifies the token against Google's public keys (audience-checked against
-    our own client ID) rather than trusting anything the client claims about
-    the user. Links to an existing account by email on first Google sign-in
-    so a user who already registered with a password doesn't get a duplicate.
+    The frontend gets this access token from Google's oauth2.initTokenClient
+    popup flow (not the One Tap prompt, which silently no-ops in too many
+    ordinary browser configurations to trigger from a button click). An
+    access token isn't a JWT we can verify locally, so we call Google's own
+    userinfo endpoint with it -- a 200 response there is Google vouching for
+    the token; anything else means it's invalid/expired. Links to an existing
+    account by email on first Google sign-in so a user who already registered
+    with a password doesn't get a duplicate.
     """
 
     def post(self):
         data = request.get_json(silent=True) or {}
-        credential = data.get('credential')
-        if not credential:
-            return {"error": "Missing credential"}, 400
+        access_token = data.get('access_token')
+        if not access_token:
+            return {"error": "Missing access token"}, 400
 
-        client_id = os.environ.get('GOOGLE_CLIENT_ID')
-        if not client_id:
+        if not os.environ.get('GOOGLE_CLIENT_ID'):
             return {"error": "Google sign-in is not configured"}, 500
 
         try:
-            payload = google_id_token.verify_oauth2_token(
-                credential, google_requests.Request(), client_id
+            resp = http_requests.get(
+                GOOGLE_USERINFO_URL,
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10,
             )
-        except ValueError:
+        except http_requests.RequestException:
+            return {"error": "Could not reach Google"}, 502
+
+        if resp.status_code != 200:
             return {"error": "Invalid Google credential"}, 401
 
+        payload = resp.json()
         google_id = payload.get('sub')
         email = payload.get('email')
         if not google_id or not email:
